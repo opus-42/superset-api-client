@@ -16,7 +16,7 @@ setup(
     extras_require={
         "dev": [
             "pytest",
-            "apache-superset==0.37.2"
+            "apache-superset==1.0.1"
         ]
     },
     classifiers=[
