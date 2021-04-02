@@ -1,5 +1,6 @@
 """A Superset REST Api Client."""
-import jwt
+from functools import partial
+
 from requests import Session
 
 
@@ -19,14 +20,8 @@ class SupersetClient:
         self._password = password
         self.session = Session()
 
-        # Bind method
-        self.get = self.session.get
-        self.post = self.session.post
-        self.put = self.session.put
-        self.delete = self.session.delete
-
         # Try authentication
-        response = self.post(self.login_endpoint, json={
+        response = self.session.post(self.login_endpoint, json={
             "username": self.username,
             "password": self._password,
             "provider": "db",
@@ -36,6 +31,24 @@ class SupersetClient:
         tokens = response.json()
         self._token = tokens.get("access_token")
         self.refresh_token = tokens.get("refresh_token")
+
+        # Bind method
+        self.get = partial(
+            self.session.get,
+            headers=self._headers
+        )
+        self.post = partial(
+            self.session.post,
+            headers=self._headers
+        )
+        self.put = partial(
+            self.session.put,
+            headers=self._headers
+        )
+        self.delete = partial(
+            self.session.delete,
+            headers=self._headers
+        )
 
     def _join_urls(self, *args) -> str:
         """Join multiple urls together.
@@ -66,4 +79,10 @@ class SupersetClient:
 
     @property
     def token(self):
-        return self.token
+        return self._token
+
+    @property
+    def _headers(self):
+        return {
+            "authorization": f"Bearer {self.token}"
+        }
