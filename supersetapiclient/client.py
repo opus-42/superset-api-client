@@ -66,23 +66,23 @@ class SupersetClient:
         return "/".join(urls)
 
     @property
-    def password(self):
+    def password(self) -> str:
         return "*" * len(self._password)
 
     @property
-    def login_endpoint(self):
+    def login_endpoint(self) -> str:
         return self._join_urls(self.base_url, "/security/login")
 
     @property
-    def refresh_endpoint(self):
+    def refresh_endpoint(self) -> str:
         return self._join_urls(self.base_url, "/security/refresh")
 
     @property
-    def token(self):
+    def token(self) -> str:
         return self._token
 
     @property
-    def _headers(self):
+    def _headers(self) -> str:
         return {
             "authorization": f"Bearer {self.token}"
         }
