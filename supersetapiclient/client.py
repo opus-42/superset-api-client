@@ -12,7 +12,7 @@ class SupersetClient:
         host,
         username,
         password,
-        port=5000,
+        port=8080,
     ):
         self.host = host
         self.base_url = self._join_urls(host, "/api/v1")
