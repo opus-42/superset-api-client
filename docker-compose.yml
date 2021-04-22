@@ -1,19 +1,9 @@
 version: "3.7"
 services:
-#  db:
-#    env_file: docker/.env
-#    image: postgres:10
-#    container_name: superset_db
-#    restart: unless-stopped
-#    ports:
-#      - "127.0.0.1:5432:5432"
-#    volumes:
-#      - db_home:/var/lib/postgresql/data
-
   superset:
     image: apache/superset:1.0.1
     container_name: superset_app
-    command: ["superset", "run", "-h", "0.0.0.0", "-p", "8080"]
+    command: ["bash", "/app/superset_home/entrypoint.sh"]
     tty: true
     restart: unless-stopped
     ports:
@@ -21,4 +11,5 @@ services:
     environment:
       - SUPERSET_CONFIG_PATH=/app/superset_home/test_config.py
     volumes:
+      - ./scripts/entrypoint.sh:/app/superset_home/entrypoint.sh
       - ./tests/superset_test_config.py:/app/superset_home/test_config.py
