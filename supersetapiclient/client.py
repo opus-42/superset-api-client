@@ -3,6 +3,8 @@ from functools import partial
 
 from requests import Session
 
+from supersetapiclient.dashboards import Dashboards
+
 
 class SupersetClient:
     """A Superset Client."""
@@ -15,7 +17,7 @@ class SupersetClient:
         port=8080,
     ):
         self.host = host
-        self.base_url = self._join_urls(host, "/api/v1")
+        self.base_url = self.join_urls(host, "/api/v1")
         self.username = username
         self._password = password
         self.session = Session()
@@ -50,7 +52,10 @@ class SupersetClient:
             headers=self._headers
         )
 
-    def _join_urls(self, *args) -> str:
+        # Related Objects
+        self.dashboards = Dashboards(self)
+
+    def join_urls(self, *args) -> str:
         """Join multiple urls together.
 
         Returns:
@@ -71,11 +76,11 @@ class SupersetClient:
 
     @property
     def login_endpoint(self) -> str:
-        return self._join_urls(self.base_url, "/security/login")
+        return self.join_urls(self.base_url, "/security/login")
 
     @property
     def refresh_endpoint(self) -> str:
-        return self._join_urls(self.base_url, "/security/refresh")
+        return self.join_urls(self.base_url, "/security/refresh")
 
     @property
     def token(self) -> str:
