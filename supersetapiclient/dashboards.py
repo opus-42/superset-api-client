@@ -27,9 +27,7 @@ class Dashboard(Object):
     changed_by_url: str = default_string()
     css: str = default_string()
     changed_on: str = default_string()
-    charts: str = default_string()
-
-
+    charts: list = default_string()
 
     @property
     def colors(self) -> dict:
