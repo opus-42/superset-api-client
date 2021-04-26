@@ -3,11 +3,14 @@ import dataclasses
 import json
 
 
+from supersetapiclient.exceptions import NotFound
+
+
 def json_field():
     return dataclasses.field(default=None, repr=False)
 
 def default_string():
-    default_string = dataclasses.field(default="", repr=False)
+    return dataclasses.field(default=None, repr=False)
 
 
 class Object:
@@ -58,6 +61,7 @@ class Object:
         client = self._parent.client
         reponse = client.get(self.base_url)
         o = reponse.json()
+        o = o.get("result")
         for k, v in o.items():
             if k in field_names:
                 setattr(self, k, v)
@@ -120,7 +124,6 @@ class ObjectFactories:
                 } for k, v in kwargs.items()
             ]
         }
-        print(query)
         response = self.client.get(
             url,
             params={
@@ -137,3 +140,10 @@ class ObjectFactories:
             objects.append(o)
 
         return objects
+
+    def find_one(self, **kwargs):
+        """Find only object or raise an Exception."""
+        objects = self.find(**kwargs)
+        if len(objects) == 0:
+            raise NotFound(f"No {self.base_object.__name__} has been found.")
+        return objects[0]
