@@ -1,9 +1,10 @@
 """A Superset REST Api Client."""
 from functools import partial
 
-from requests import Session
+import requests
 
 from supersetapiclient.dashboards import Dashboards
+from supersetapiclient.charts import Charts
 
 
 class SupersetClient:
@@ -20,9 +21,9 @@ class SupersetClient:
         self.base_url = self.join_urls(host, "/api/v1")
         self.username = username
         self._password = password
-        self.session = Session()
+        self.session = requests.Session()
 
-        # Try authentication
+        # Try authentication and define session
         response = self.session.post(self.login_endpoint, json={
             "username": self.username,
             "password": self._password,
@@ -33,6 +34,11 @@ class SupersetClient:
         tokens = response.json()
         self._token = tokens.get("access_token")
         self.refresh_token = tokens.get("refresh_token")
+
+        # Update headers
+        self.session.headers.update(
+            self._headers
+        )
 
         # Bind method
         self.get = partial(
@@ -54,6 +60,7 @@ class SupersetClient:
 
         # Related Objects
         self.dashboards = Dashboards(self)
+        self.charts = Charts(self)
 
     def join_urls(self, *args) -> str:
         """Join multiple urls together.
@@ -62,10 +69,12 @@ class SupersetClient:
             str: joined urls
         """
         urls = []
+        i = 0
         for u in args:
+            i += 1
             if u[0] == "/":
                 u = u[1:]
-            if u[-1] == "/":
+            if u[-1] == "/" and i != len(args):
                 u = u[:-1]
             urls.append(u)
         return "/".join(urls)

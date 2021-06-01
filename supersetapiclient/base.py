@@ -2,7 +2,6 @@
 import dataclasses
 import json
 
-
 from supersetapiclient.exceptions import NotFound
 
 
@@ -10,7 +9,7 @@ def json_field():
     return dataclasses.field(default=None, repr=False)
 
 def default_string():
-    return dataclasses.field(default=None, repr=False)
+    return dataclasses.field(default="", repr=False)
 
 
 class Object:
@@ -107,28 +106,48 @@ class ObjectFactories:
         """Base url for these objects."""
         return self.client.join_urls(
             self.client.base_url,
-            self.endpoint
+            self.endpoint,
         )
+
+    def get(self, id: int):
+        """Get an object by id."""
+        url = self.base_url + str(id)
+        response = self.client.get(
+            url
+        )
+        response.raise_for_status()
+        response = response.json()
+
+        object_json = response.get("result")
+        object_json["id"] = id
+        object = self.base_object.from_json(object_json)
+        object._parent = self
+
+        return object
 
     def find(self, **kwargs):
         """Find and get objects from api."""
         url = self.base_url
 
         # Get response
-        query = {
-            "filters": [
-                {
-                    "col": k,
-                    "opr": "eq",
-                    "value": v
-                } for k, v in kwargs.items()
-            ]
-        }
-        response = self.client.get(
-            url,
-            params={
+        if kwargs != {}:
+            query = {
+                "filters": [
+                    {
+                        "col": k,
+                        "opr": "eq",
+                        "value": v
+                    } for k, v in kwargs.items()
+                ]
+            }
+            params = {
                 "q": json.dumps(query)
             }
+        else:
+            params = {}
+        response = self.client.get(
+            url,
+            params=params
         )
         response.raise_for_status()
         response = response.json()

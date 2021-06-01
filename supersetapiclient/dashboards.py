@@ -1,5 +1,5 @@
 """Dashboards."""
-import json
+from typing import List
 
 from dataclasses import dataclass
 
@@ -46,6 +46,17 @@ class Dashboard(Object):
         self.colors = colors
 
 
+    def get_charts(self) -> List[int]:
+        """Get dashboard Slice IDs."""
+        charts = []
+        for _, v in self.position_json.items():
+            if isinstance(v, dict):
+                if v.get("type") == "CHART":
+                    meta = v.get("meta", {})
+                    if meta.get("chartId") is not None:
+                        charts.append(meta.get("chartId"))
+        return charts
+
 class Dashboards(ObjectFactories):
-    endpoint = "/dashboard"
+    endpoint = "/dashboard/"
     base_object = Dashboard
