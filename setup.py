@@ -5,7 +5,9 @@ with open("README.md", "r") as f:
 
 setup(
     name="superset-api-client",
+    version="0.1.1",
     description=("A simple REST Api Client for Apache-Superset"),
+    url="https://github.com/opus-42/superset-api-client",
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(),
