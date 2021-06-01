@@ -5,6 +5,7 @@ import requests
 
 from supersetapiclient.dashboards import Dashboards
 from supersetapiclient.charts import Charts
+from supersetapiclient.datasets import Datasets
 
 
 class SupersetClient:
@@ -61,6 +62,7 @@ class SupersetClient:
         # Related Objects
         self.dashboards = Dashboards(self)
         self.charts = Charts(self)
+        self.datasets = Datasets(self)
 
     def join_urls(self, *args) -> str:
         """Join multiple urls together.
