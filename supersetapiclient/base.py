@@ -1,8 +1,11 @@
 """Base classes."""
+import logging
 import dataclasses
 import json
 
 from supersetapiclient.exceptions import NotFound
+
+logger = logging.getLogger(__name__)
 
 
 def json_field():
@@ -76,8 +79,10 @@ class Object:
                     value = json.dumps(value)
                 o[c] = value
 
-        reponse = self._parent.client.put(self.base_url, json=o)
-        reponse.raise_for_status()
+        response = self._parent.client.put(self.base_url, json=o)
+        if response.status_code in [400, 422]:
+            logger.error(response.text)
+        response.raise_for_status()
 
 
 class ObjectFactories:
@@ -99,6 +104,10 @@ class ObjectFactories:
         self.edit_columns = [
             e.get("name")
             for e in infos.get("edit_columns")
+        ]
+        self.add_columns = [
+            e.get("name")
+            for e in infos.get("add_columns")
         ]
 
     @property
@@ -166,3 +175,20 @@ class ObjectFactories:
         if len(objects) == 0:
             raise NotFound(f"No {self.base_object.__name__} has been found.")
         return objects[0]
+
+    def add(self, obj) -> int:
+        """Create a object on remote."""
+        url = self.base_url
+
+        o = {}
+        for c in self.add_columns:
+            if hasattr(obj, c):
+                value = getattr(obj, c)
+
+                if c in obj.JSON_FIELDS:
+                    value = json.dumps(value)
+                o[c] = value
+
+        response = self.client.post(self.base_url, json=o)
+        response.raise_for_status()
+        return response.json().get("id")
