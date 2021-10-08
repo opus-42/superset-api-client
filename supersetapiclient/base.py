@@ -89,6 +89,13 @@ class ObjectFactories:
     endpoint = ""
     base_object = None
 
+    _INFO_QUERY = {
+        "keys": [
+            "add_columns",
+            "edit_columns"
+        ]
+    }
+
     def __init__(self, client):
         """Create a new Dashboards endpoint.
 
@@ -98,10 +105,14 @@ class ObjectFactories:
         self.client = client
 
         # Get infos
-        response = client.get(client.join_urls(
-            self.base_url,
-            "_info"
-        ))
+        response = client.get(
+            client.join_urls(
+                self.base_url,
+                "_info",
+            ),
+            params={
+                "q": json.dumps(self._INFO_QUERY)
+            })
 
         if response.status_code != 200:
             logger.error(f"Unable to build object factory for {self.endpoint}")
@@ -110,11 +121,11 @@ class ObjectFactories:
         infos = response.json()
         self.edit_columns = [
             e.get("name")
-            for e in infos.get("edit_columns")
+            for e in infos.get("edit_columns", [])
         ]
         self.add_columns = [
             e.get("name")
-            for e in infos.get("add_columns")
+            for e in infos.get("add_columns", [])
         ]
 
     @property

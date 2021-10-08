@@ -62,6 +62,13 @@ class SupersetClient:
             headers=self._headers
         )
 
+        # Get CSRF Token
+        csrf_response = self.get(
+            self.join_urls(self.base_url, "/security/csrf_token")
+        )
+        csrf_response.raise_for_status()
+        self._csrf_token = csrf_response.json().get("result")
+
         # Related Objects
         self.dashboards = Dashboards(self)
         self.charts = Charts(self)
@@ -101,7 +108,12 @@ class SupersetClient:
         return self._token
 
     @property
+    def csrf_token(self) -> str:
+        pass
+
+    @property
     def _headers(self) -> str:
         return {
-            "authorization": f"Bearer {self.token}"
+            "authorization": f"Bearer {self.token}",
+            "X-CSRFToken": f"{self.csrf_token}"
         }
