@@ -86,6 +86,8 @@ class Object:
 
 
 class ObjectFactories:
+    endpoint = ""
+    base_object = None
 
     def __init__(self, client):
         """Create a new Dashboards endpoint.
@@ -100,6 +102,11 @@ class ObjectFactories:
             self.base_url,
             "_info"
         ))
+
+        if response.status_code != 200:
+            logger.error(f"Unable to build object factory for {self.endpoint}")
+            response.raise_for_status()
+
         infos = response.json()
         self.edit_columns = [
             e.get("name")

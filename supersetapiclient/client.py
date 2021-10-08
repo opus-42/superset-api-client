@@ -1,4 +1,5 @@
 """A Superset REST Api Client."""
+import logging
 from functools import partial
 
 import requests
@@ -6,6 +7,8 @@ import requests
 from supersetapiclient.dashboards import Dashboards
 from supersetapiclient.charts import Charts
 from supersetapiclient.datasets import Datasets
+
+logger = logging.getLogger(__name__)
 
 
 class SupersetClient:
