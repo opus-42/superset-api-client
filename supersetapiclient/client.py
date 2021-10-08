@@ -1,4 +1,5 @@
 """A Superset REST Api Client."""
+import logging
 from functools import partial
 
 import requests
@@ -6,6 +7,8 @@ import requests
 from supersetapiclient.dashboards import Dashboards
 from supersetapiclient.charts import Charts
 from supersetapiclient.datasets import Datasets
+
+logger = logging.getLogger(__name__)
 
 
 class SupersetClient:
@@ -35,6 +38,15 @@ class SupersetClient:
         tokens = response.json()
         self._token = tokens.get("access_token")
         self.refresh_token = tokens.get("refresh_token")
+
+        # Get CSRF Token
+        self._csrf_token = None
+        csrf_response = self.session.get(
+            self.join_urls(self.base_url, "/security/csrf_token"),
+            headers=self._headers
+        )
+        csrf_response.raise_for_status() # Check CSRF Token went well
+        self._csrf_token = csrf_response.json().get("result")
 
         # Update headers
         self.session.headers.update(
@@ -98,7 +110,12 @@ class SupersetClient:
         return self._token
 
     @property
+    def csrf_token(self) -> str:
+        return self._csrf_token
+
+    @property
     def _headers(self) -> str:
         return {
-            "authorization": f"Bearer {self.token}"
+            "authorization": f"Bearer {self.token}",
+            "X-CSRFToken": f"{self.csrf_token}"
         }

@@ -3,6 +3,8 @@ import logging
 import dataclasses
 import json
 
+from requests import Response
+
 from supersetapiclient.exceptions import NotFound
 
 logger = logging.getLogger(__name__)
@@ -86,6 +88,15 @@ class Object:
 
 
 class ObjectFactories:
+    endpoint = ""
+    base_object = None
+
+    _INFO_QUERY = {
+        "keys": [
+            "add_columns",
+            "edit_columns"
+        ]
+    }
 
     def __init__(self, client):
         """Create a new Dashboards endpoint.
@@ -96,18 +107,27 @@ class ObjectFactories:
         self.client = client
 
         # Get infos
-        response = client.get(client.join_urls(
-            self.base_url,
-            "_info"
-        ))
+        response = client.get(
+            client.join_urls(
+                self.base_url,
+                "_info",
+            ),
+            params={
+                "q": json.dumps(self._INFO_QUERY)
+            })
+
+        if response.status_code != 200:
+            logger.error(f"Unable to build object factory for {self.endpoint}")
+            response.raise_for_status()
+
         infos = response.json()
         self.edit_columns = [
             e.get("name")
-            for e in infos.get("edit_columns")
+            for e in infos.get("edit_columns", [])
         ]
         self.add_columns = [
             e.get("name")
-            for e in infos.get("add_columns")
+            for e in infos.get("add_columns", [])
         ]
 
     @property
@@ -117,6 +137,17 @@ class ObjectFactories:
             self.client.base_url,
             self.endpoint,
         )
+
+    @staticmethod
+    def _handle_reponse_status(reponse: Response) -> None:
+        """Handle response status."""
+        if reponse.status_code not in (200, 201):
+            logger.error(f"Unable to proceed with request on ")
+            logger.error(f"API response is {reponse.text}")
+
+        # Finally raising for status
+        reponse.raise_for_status()
+
 
     def get(self, id: int):
         """Get an object by id."""
