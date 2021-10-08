@@ -39,6 +39,15 @@ class SupersetClient:
         self._token = tokens.get("access_token")
         self.refresh_token = tokens.get("refresh_token")
 
+        # Get CSRF Token
+        self._csrf_token = None
+        csrf_response = self.session.get(
+            self.join_urls(self.base_url, "/security/csrf_token"),
+            headers=self._headers
+        )
+        csrf_response.raise_for_status() # Check CSRF Token went well
+        self._csrf_token = csrf_response.json().get("result")
+
         # Update headers
         self.session.headers.update(
             self._headers
@@ -61,13 +70,6 @@ class SupersetClient:
             self.session.delete,
             headers=self._headers
         )
-
-        # Get CSRF Token
-        csrf_response = self.get(
-            self.join_urls(self.base_url, "/security/csrf_token")
-        )
-        csrf_response.raise_for_status()
-        self._csrf_token = csrf_response.json().get("result")
 
         # Related Objects
         self.dashboards = Dashboards(self)
@@ -109,7 +111,7 @@ class SupersetClient:
 
     @property
     def csrf_token(self) -> str:
-        pass
+        return self._csrf_token
 
     @property
     def _headers(self) -> str:

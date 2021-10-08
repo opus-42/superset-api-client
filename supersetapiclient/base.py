@@ -3,6 +3,8 @@ import logging
 import dataclasses
 import json
 
+from requests import Response
+
 from supersetapiclient.exceptions import NotFound
 
 logger = logging.getLogger(__name__)
@@ -135,6 +137,17 @@ class ObjectFactories:
             self.client.base_url,
             self.endpoint,
         )
+
+    @staticmethod
+    def _handle_reponse_status(reponse: Response) -> None:
+        """Handle response status."""
+        if reponse.status_code not in (200, 201):
+            logger.error(f"Unable to proceed with request on ")
+            logger.error(f"API response is {reponse.text}")
+
+        # Finally raising for status
+        reponse.raise_for_status()
+
 
     def get(self, id: int):
         """Get an object by id."""
