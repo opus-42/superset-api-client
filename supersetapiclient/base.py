@@ -57,6 +57,13 @@ class Object:
             self._parent.base_url,
             str(self.id)
         )
+        
+    @property
+    def import_url(self) -> str:
+        return self._parent.client.join_urls(
+            self._parent.base_url,
+            str(self.id)
+        )
 
     def fetch(self) -> None:
         """Fetch additional object information."""
@@ -137,7 +144,15 @@ class ObjectFactories:
             self.client.base_url,
             self.endpoint,
         )
-
+        
+    @property
+    def import_url(self):
+        """Base url for these objects."""
+        return self.client.join_urls(
+            self.client.base_url,
+            self.endpoint,
+            "import"
+        )
     @staticmethod
     def _handle_reponse_status(reponse: Response) -> None:
         """Handle response status."""
@@ -223,3 +238,17 @@ class ObjectFactories:
         response = self.client.post(self.base_url, json=o)
         response.raise_for_status()
         return response.json().get("id")
+
+    def import_file(self, file_path) -> int:
+        """Import a file on remote."""
+        url = self.import_url
+        
+        file = {'formData': (file_path, open(file_path, 'rb'), 'application/json')}
+        
+        response = self.client.post(url, files = file)
+        response.raise_for_status()
+        """If import is successful, the following is returned: {'message': 'OK'}"""
+        if response.json().get('message') == 'OK':
+            return True
+        else:
+            return False
