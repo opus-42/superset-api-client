@@ -64,6 +64,13 @@ class Object:
             self._parent.base_url,
             str(self.id)
         )
+    
+    @property
+    def test_connection_url(self) -> str:
+        return self._parent.client.join_urls(
+            self._parent.base_url,
+            str(self.id)
+        )
 
     def fetch(self) -> None:
         """Fetch additional object information."""
@@ -153,6 +160,16 @@ class ObjectFactories:
             self.endpoint,
             "import"
         )
+    
+    @property
+    def test_connection_url(self):
+        """Base url for these objects."""
+        return self.client.join_urls(
+            self.client.base_url,
+            self.endpoint,
+            "test_connection"
+        )
+
     @staticmethod
     def _handle_reponse_status(reponse: Response) -> None:
         """Handle response status."""
@@ -248,6 +265,22 @@ class ObjectFactories:
         response = self.client.post(url, files = file)
         response.raise_for_status()
         """If import is successful, the following is returned: {'message': 'OK'}"""
+        if response.json().get('message') == 'OK':
+            return True
+        else:
+            return False
+
+    def test_connection(self, obj)   :
+        """Import a file on remote."""
+        url = self.test_connection_url
+        connection_columns = ['database_name', 'sqlalchemy_uri']
+        o = {}
+        for c in connection_columns:
+            if hasattr(obj, c):
+                value = getattr(obj, c)
+                o[c] = value
+
+        response = self.client.post(url, json=o)
         if response.json().get('message') == 'OK':
             return True
         else:
