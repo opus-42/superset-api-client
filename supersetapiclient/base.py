@@ -139,10 +139,16 @@ class ObjectFactories:
             e.get("name")
             for e in infos.get("edit_columns", [])
         ]
-        self.add_columns = [
-            e.get("name")
-            for e in infos.get("add_columns", [])
-        ]
+        #
+        #Due to the design of the superset API, get /chart/_info only returns 'slice_name'
+        #for chart adds to work, we require the additional attributes: 'datasource_id', 'datasource_type'
+        if self.__class__.__name__ == 'Charts':
+            self.add_columns = ['datasource_id', 'datasource_type', 'slice_name', 'params', 'viz_type', 'description']
+        else:    
+            self.add_columns = [
+                e.get("name")
+                for e in infos.get("add_columns", [])
+            ]
 
     @property
     def base_url(self):
