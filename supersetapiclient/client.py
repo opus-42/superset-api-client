@@ -126,5 +126,6 @@ class SupersetClient:
     def _headers(self) -> str:
         return {
             "authorization": f"Bearer {self.token}",
-            "X-CSRFToken": f"{self.csrf_token}"
+            "X-CSRFToken": f"{self.csrf_token}",
+            "Referer": f"{self.base_url}"
         }
