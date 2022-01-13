@@ -49,7 +49,7 @@ class SupersetClient:
             headers=self._headers,
             verify=self.verify
         )
-        csrf_response.raise_for_status() # Check CSRF Token went well
+        csrf_response.raise_for_status()  # Check CSRF Token went well
         self._csrf_token = csrf_response.json().get("result")
 
         # Update headers

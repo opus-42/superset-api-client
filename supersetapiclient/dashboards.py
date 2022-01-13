@@ -45,7 +45,6 @@ class Dashboard(Object):
         colors.update(value)
         self.colors = colors
 
-
     def get_charts(self) -> List[int]:
         """Get dashboard Slice IDs."""
         charts = []
@@ -56,6 +55,7 @@ class Dashboard(Object):
                     if meta.get("chartId") is not None:
                         charts.append(meta.get("chartId"))
         return charts
+
 
 class Dashboards(ObjectFactories):
     endpoint = "/dashboard/"

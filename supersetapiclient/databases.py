@@ -1,6 +1,4 @@
 """Databases."""
-from typing import List
-
 from dataclasses import dataclass
 
 from supersetapiclient.base import (
@@ -11,7 +9,7 @@ from supersetapiclient.base import (
 @dataclass
 class Database(Object):
     JSON_FIELDS = ["metadata_cache_timeout"]
-    
+
     id: int
     database_name: str
     allow_ctas: bool
@@ -27,8 +25,7 @@ class Database(Object):
     server_cert: str = default_string()
     sqlalchemy_uri: str = default_string()
 
-    
-        
+
 class Databases(ObjectFactories):
     endpoint = "/database/"
     base_object = Database

@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 def json_field():
     return dataclasses.field(default=None, repr=False)
 
+
 def default_string():
     return dataclasses.field(default="", repr=False)
 
@@ -45,7 +46,7 @@ class Object:
             Object: return the related object
         """
         field_names = cls.field_names()
-        return cls(**{k:v for k,v in json.items() if k in field_names})
+        return cls(**{k: v for k, v in json.items() if k in field_names})
 
     def __post_init__(self):
         for f in self.JSON_FIELDS:
@@ -57,14 +58,14 @@ class Object:
             self._parent.base_url,
             str(self.id)
         )
-        
+
     @property
     def import_url(self) -> str:
         return self._parent.client.join_urls(
             self._parent.base_url,
             str(self.id)
         )
-    
+
     @property
     def test_connection_url(self) -> str:
         return self._parent.client.join_urls(
@@ -140,11 +141,24 @@ class ObjectFactories:
             for e in infos.get("edit_columns", [])
         ]
         #
-        #Due to the design of the superset API, get /chart/_info only returns 'slice_name'
-        #for chart adds to work, we require the additional attributes: 'datasource_id', 'datasource_type'
+        # Need to find a solution
+        #
+        # Due to the design of the superset API,
+        # get /chart/_info only returns 'slice_name'
+        # for chart adds to work,
+        # we require the additional attributes:
+        #   'datasource_id',
+        #   'datasource_type'
         if self.__class__.__name__ == 'Charts':
-            self.add_columns = ['datasource_id', 'datasource_type', 'slice_name', 'params', 'viz_type', 'description']
-        else:    
+            self.add_columns = [
+                'datasource_id',
+                'datasource_type',
+                'slice_name',
+                'params',
+                'viz_type',
+                'description'
+            ]
+        else:
             self.add_columns = [
                 e.get("name")
                 for e in infos.get("add_columns", [])
@@ -157,7 +171,7 @@ class ObjectFactories:
             self.client.base_url,
             self.endpoint,
         )
-        
+
     @property
     def import_url(self):
         """Base url for these objects."""
@@ -166,7 +180,7 @@ class ObjectFactories:
             self.endpoint,
             "import"
         )
-    
+
     @property
     def test_connection_url(self):
         """Base url for these objects."""
@@ -180,12 +194,11 @@ class ObjectFactories:
     def _handle_reponse_status(reponse: Response) -> None:
         """Handle response status."""
         if reponse.status_code not in (200, 201):
-            logger.error(f"Unable to proceed with request on ")
+            logger.error("Unable to proceed with request on ")
             logger.error(f"API response is {reponse.text}")
 
         # Finally raising for status
         reponse.raise_for_status()
-
 
     def get(self, id: int):
         """Get an object by id."""
@@ -247,7 +260,6 @@ class ObjectFactories:
 
     def add(self, obj) -> int:
         """Create a object on remote."""
-        url = self.base_url
 
         o = {}
         for c in self.add_columns:
@@ -265,18 +277,20 @@ class ObjectFactories:
     def import_file(self, file_path) -> int:
         """Import a file on remote."""
         url = self.import_url
-        
-        file = {'formData': (file_path, open(file_path, 'rb'), 'application/json')}
-        
-        response = self.client.post(url, files = file)
+
+        file = {'formData': (file_path, open(
+            file_path, 'rb'), 'application/json')}
+
+        response = self.client.post(url, files=file)
         response.raise_for_status()
-        """If import is successful, the following is returned: {'message': 'OK'}"""
+        # If import is successful,
+        # the following is returned: {'message': 'OK'}
         if response.json().get('message') == 'OK':
             return True
         else:
             return False
 
-    def test_connection(self, obj)   :
+    def test_connection(self, obj):
         """Import a file on remote."""
         url = self.test_connection_url
         connection_columns = ['database_name', 'sqlalchemy_uri']
