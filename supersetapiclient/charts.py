@@ -1,4 +1,4 @@
-"""Dashboards."""
+"""Charts."""
 from typing import List
 
 from dataclasses import dataclass
@@ -19,7 +19,9 @@ class Chart(Object):
     slice_name: default_string()
     params: json_field()
     datasource_id: int = None
+    datasource_type: str = default_string
     viz_type: str = ""
+    params: dict = json_field()
 
 
 class Charts(ObjectFactories):
