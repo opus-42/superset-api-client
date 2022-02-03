@@ -67,6 +67,15 @@ class Object:
         )
 
     @property
+    def export_url(self) -> str:
+        return self._parent.client.join_urls(
+            self._parent.base_url,
+            "/export/?q=!(",
+            str(self.id),
+            ')'
+        )
+
+    @property
     def test_connection_url(self) -> str:
         return self._parent.client.join_urls(
             self._parent.base_url,
@@ -182,6 +191,15 @@ class ObjectFactories:
         )
 
     @property
+    def export_url(self):
+        """Base url for these objects."""
+        return self.client.join_urls(
+            self.client.base_url,
+            self.endpoint,
+            "export"
+        )
+
+    @property
     def test_connection_url(self):
         """Base url for these objects."""
         return self.client.join_urls(
@@ -273,6 +291,20 @@ class ObjectFactories:
         response = self.client.post(self.base_url, json=o)
         response.raise_for_status()
         return response.json().get("id")
+
+    def export_dashboard(self,id: int, name: str) -> None:
+        """Export dashboard to a importable file"""
+        client = self.client
+        url = self.export_url
+        response = client.get(url + "/?q=!(" + str(id) + ')')
+
+        if response.status_code in [400, 422]:
+            logger.error(response.text)
+        response.raise_for_status()
+        
+        data = response.json()
+        with open( name + '.json', 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
     def import_file(self, file_path) -> int:
         """Import a file on remote."""
