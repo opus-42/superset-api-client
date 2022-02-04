@@ -303,17 +303,17 @@ class ObjectFactories:
             logger.error(response.text)
         response.raise_for_status()
         
-        if response.headers["content-type"].strip().startswith("application/json"):
-            data = response.json()
-            with open( name + '.json', 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=4)
-            return(response.json())
-        else:
+        if response.headers["content-type"].strip().startswith("application/text"):
             data = response.text
             data = yaml.load(data, Loader=yaml.FullLoader)
             with open( name + '.yaml', 'w', encoding='utf-8') as f:
                 yaml.dump(data, f, default_flow_style=False)
             return(response.text)
+        else:
+            data = response.json()
+            with open( name + '.json', 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            return(response.json())
 
     def import_file(self, file_path) -> int:
         """Import a file on remote."""
