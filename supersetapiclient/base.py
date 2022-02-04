@@ -2,6 +2,7 @@
 import logging
 import dataclasses
 import json
+import yaml
 
 from requests import Response
 
@@ -292,8 +293,8 @@ class ObjectFactories:
         response.raise_for_status()
         return response.json().get("id")
 
-    def export_dashboard(self,id: int, name: str) -> None:
-        """Export dashboard to a importable file"""
+    def export(self,id: int, name: str) -> None:
+        """Export dashboard or dataset to an importable file"""
         client = self.client
         url = self.export_url
         response = client.get(url + "/?q=!(" + str(id) + ')')
@@ -302,9 +303,17 @@ class ObjectFactories:
             logger.error(response.text)
         response.raise_for_status()
         
-        data = response.json()
-        with open( name + '.json', 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        if response.headers["content-type"].strip().startswith("application/json"):
+            data = response.json()
+            with open( name + '.json', 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            return(response.json())
+        else:
+            data = response.text
+            data = yaml.load(data, Loader=yaml.FullLoader)
+            with open( name + '.yaml', 'w', encoding='utf-8') as f:
+                yaml.dump(data, f, default_flow_style=False)
+            return(response.text)
 
     def import_file(self, file_path) -> int:
         """Import a file on remote."""

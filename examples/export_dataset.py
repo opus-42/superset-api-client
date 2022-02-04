@@ -6,5 +6,5 @@ client = SupersetClient(
     password="admin",
 )
 
-dashboard = client.dashboards.find(dashboard_title="Example")[0]
-client.dashboards.export(id=dashboard.id, name=dashboard.dashboard_title)
+dataset = client.datasets.find(table_name="Example")[0]
+client.datasets.export(id=dataset.id, name=dataset.table_name)
