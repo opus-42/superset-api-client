@@ -16,6 +16,7 @@ client = SupersetClient(
 )
 ```
 
+### Quickstart
 Get all dashboards or find one by name:
 ```python3
 # Get all dashboards
@@ -40,6 +41,29 @@ dashboard.dashboard_title = "New title"
 # Save all changes
 dashboard.save()
 ```
+
+### Export one ore more dashboard
+
+You may export one or more dashboard user `client.dashboards` or directly on a `dashboard` object
+
+```python3
+# Export many dashboards
+client.dashboards.export(
+    # Set dashboard ids you would like to export
+    [
+        1,
+        2
+    ],
+    "./dashboards.json" # A string or a path-like object where export will be saved
+)
+
+# Export one dashboard
+dashboard.export(
+    "./dashboard.json"
+)
+```
+
+This functionality is also available in the same manner for datasets
 
 ## Development
 
