@@ -6,5 +6,13 @@ client = SupersetClient(
     password="admin",
 )
 
-dashboard = client.dashboards.find(dashboard_title="Example")[0]
-client.dashboards.export(id=dashboard.id, name=dashboard.dashboard_title)
+# Export one dashboard
+dashboard = client.dashboards.find(dashboard_title="Unicode Test")[0]
+dashboard.export("one_dashboard")
+
+
+# Export multiple dashboards
+client.dashboards.export(
+    ids=[10, 11],
+    path="./multiple_dashboards"
+)

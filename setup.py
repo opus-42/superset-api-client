@@ -13,7 +13,8 @@ setup(
     packages=find_packages(),
     author="Emmanuel B.",
     install_requires=[
-        "requests"
+        "requests",
+        "pyyaml"
     ],
     extras_require={
         "dev": [
