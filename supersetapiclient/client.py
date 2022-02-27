@@ -45,7 +45,7 @@ class SupersetClient:
         # Get CSRF Token
         self._csrf_token = None
         csrf_response = self.session.get(
-            self.join_urls(self.base_url, "/security/csrf_token"),
+            self.join_urls(self.base_url, "/security/csrf_token/"),
             headers=self._headers,
             verify=self.verify
         )
