@@ -290,6 +290,17 @@ class ObjectFactories:
 
         return objects
 
+    def count(self):
+        """Delete a object on remote."""
+        response = self.client.get(self.base_url)
+
+        if response.status_code not in (200, 201):
+            logger.error(response.text)
+        response.raise_for_status()
+
+        json = response.json()
+        return(json['count'])
+
     def find_one(self, **kwargs):
         """Find only object or raise an Exception."""
         objects = self.find(**kwargs)
@@ -340,6 +351,19 @@ class ObjectFactories:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
         return data
+
+    def delete(self, id) -> int:
+        """Delete a object on remote."""
+        response = self.client.delete(self.base_url + str(id))
+
+        if response.status_code not in (200, 201):
+            logger.error(response.text)
+        response.raise_for_status()
+
+        if response.json().get('message') == 'OK':
+            return True
+        else:
+            return False
 
     def import_file(self, file_path) -> int:
         """Import a file on remote."""
