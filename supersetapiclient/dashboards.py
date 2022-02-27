@@ -40,6 +40,10 @@ class Dashboard(Object):
         """Set dashboard color mapping."""
         self.json_metadata["label_colors"] = value
 
+    def update_slug(self, value: str) -> None:
+        """Update dashboard slug."""
+        self.slug = value
+
     def update_colors(self, value: dict) -> None:
         """Update dashboard colors."""
         colors = self.colors
