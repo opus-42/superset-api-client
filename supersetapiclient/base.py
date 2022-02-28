@@ -91,7 +91,7 @@ class Object:
         """Export object to path"""
         if not self.EXPORTABLE:
             raise NotImplementedError(
-                f"Export is not defined for this object."
+                "Export is not defined for this object."
             )
 
         # Get export response
@@ -230,14 +230,16 @@ class ObjectFactories:
         )
 
     @staticmethod
-    def _handle_reponse_status(reponse: Response) -> None:
+    def _handle_reponse_status(response: Response) -> None:
         """Handle response status."""
-        if reponse.status_code not in (200, 201):
-            logger.error("Unable to proceed with request on ")
-            logger.error(f"API response is {reponse.text}")
+        if response.status_code not in (200, 201):
+            logger.error(
+                f"Unable to proceed, API return {response.status_code}"
+            )
+            logger.error(f"Full API response is {response.text}")
 
         # Finally raising for status
-        reponse.raise_for_status()
+        response.raise_for_status()
 
     def get(self, id: int):
         """Get an object by id."""
