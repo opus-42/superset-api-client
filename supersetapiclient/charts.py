@@ -1,4 +1,4 @@
-"""Dashboards."""
+"""Charts."""
 from dataclasses import dataclass
 
 from supersetapiclient.base import (
@@ -17,7 +17,9 @@ class Chart(Object):
     slice_name: default_string()
     params: json_field()
     datasource_id: int = None
+    datasource_type: str = default_string
     viz_type: str = ""
+    params: dict = json_field()
 
 
 class Charts(ObjectFactories):

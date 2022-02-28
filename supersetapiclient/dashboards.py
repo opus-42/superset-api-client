@@ -14,6 +14,7 @@ class Dashboard(Object):
         "json_metadata",
         "position_json"
     ]
+    EXPORTABLE = True
 
     id: int
     dashboard_title: str
