@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from superset.app import create_app
-from werkzeug import test
 from supersetapiclient.client import SupersetClient
 
 # Launch and configure local superset application
@@ -19,7 +18,7 @@ def test_client():
     app = create_app()
 
     with app.test_client() as client:
-        with app.app_context() as app_context:
+        with app.app_context() as app_context:  # noqa
             admin = app.appbuilder.sm.find_role("Admin")
             app.appbuilder.sm.add_user(
                 username="test",
