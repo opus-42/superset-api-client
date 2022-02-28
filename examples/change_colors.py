@@ -1,5 +1,4 @@
 from supersetapiclient.client import SupersetClient
-from supersetapiclient.dashboards import Dashboard, Dashboards
 
 client = SupersetClient(
     host="http://localhost:8080",
