@@ -91,7 +91,7 @@ class Object:
         """Export object to path"""
         if not self.EXPORTABLE:
             raise NotImplementedError(
-                f"Export is not defined for this object."
+                "Export is not defined for this object."
             )
 
         # Get export response
