@@ -1,6 +1,4 @@
 """Dashboards."""
-from typing import List
-
 from dataclasses import dataclass
 
 from supersetapiclient.base import (

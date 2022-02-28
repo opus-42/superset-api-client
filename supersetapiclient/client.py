@@ -45,7 +45,7 @@ class SupersetClient:
             self.join_urls(self.base_url, "/security/csrf_token"),
             headers=self._headers
         )
-        csrf_response.raise_for_status() # Check CSRF Token went well
+        csrf_response.raise_for_status()  # Check CSRF Token went well
         self._csrf_token = csrf_response.json().get("result")
 
         # Update headers

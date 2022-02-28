@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 def json_field():
     return dataclasses.field(default=None, repr=False)
 
+
 def default_string():
     return dataclasses.field(default="", repr=False)
 
@@ -45,7 +46,7 @@ class Object:
             Object: return the related object
         """
         field_names = cls.field_names()
-        return cls(**{k:v for k,v in json.items() if k in field_names})
+        return cls(**{k: v for k, v in json.items() if k in field_names})
 
     def __post_init__(self):
         for f in self.JSON_FIELDS:
@@ -139,15 +140,16 @@ class ObjectFactories:
         )
 
     @staticmethod
-    def _handle_reponse_status(reponse: Response) -> None:
+    def _handle_reponse_status(response: Response) -> None:
         """Handle response status."""
-        if reponse.status_code not in (200, 201):
-            logger.error(f"Unable to proceed with request on ")
-            logger.error(f"API response is {reponse.text}")
+        if response.status_code not in (200, 201):
+            logger.error(
+                f"Unable to proceed, API return {response.status_code}"
+            )
+            logger.error(f"Full API response is {response.text}")
 
         # Finally raising for status
-        reponse.raise_for_status()
-
+        response.raise_for_status()
 
     def get(self, id: int):
         """Get an object by id."""
@@ -209,7 +211,6 @@ class ObjectFactories:
 
     def add(self, obj) -> int:
         """Create a object on remote."""
-        url = self.base_url
 
         o = {}
         for c in self.add_columns:

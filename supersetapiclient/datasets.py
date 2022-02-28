@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 
 from supersetapiclient.base import (
-    Object, ObjectFactories, json_field, default_string
+    Object, ObjectFactories
 )
 
 
@@ -15,6 +15,7 @@ class Dataset(Object):
     schema: str = ""
     columns: list = field(default_factory=list)
     description: str = ""
+
 
 class Datasets(ObjectFactories):
     endpoint = "/dataset/"
