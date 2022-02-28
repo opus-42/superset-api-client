@@ -293,7 +293,9 @@ class ObjectFactories:
         return objects
 
     def count(self):
-        """Delete a object on remote."""
+        """Count objects."""
+
+        # To do : add kwargs parameters for more flexibility
         response = self.client.get(self.base_url)
 
         if response.status_code not in (200, 201):
