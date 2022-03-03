@@ -30,8 +30,8 @@ class SupersetClient:
         self.session = requests.Session()
         self.verify = verify
 
-        self.authenticate()
-        
+        self._token, self.refresh_token = self.authenticate()
+
         # Get CSRF Token
         self._csrf_token = None
         csrf_response = self.session.get(
@@ -92,7 +92,7 @@ class SupersetClient:
             urls.append(u)
         return "/".join(urls)
 
-    def authenticate(self) -> None:
+    def authenticate(self) -> tuple[str, str | None]:
         # Try authentication and define session
         response = self.session.post(self.login_endpoint, json={
             "username": self.username,
@@ -102,9 +102,8 @@ class SupersetClient:
         }, verify=self.verify)
         response.raise_for_status()
         tokens = response.json()
-        self._token = tokens.get("access_token")
-        self.refresh_token = tokens.get("refresh_token")
-    
+        return tokens.get("access_token"), tokens.get("refresh_token")
+
     @property
     def password(self) -> str:
         return "*" * len(self._password)
