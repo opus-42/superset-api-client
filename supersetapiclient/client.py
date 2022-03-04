@@ -20,7 +20,6 @@ class SupersetClient:
         host,
         username,
         password,
-        port=8080,
         verify=True,
     ):
         self.host = host
