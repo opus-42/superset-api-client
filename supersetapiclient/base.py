@@ -99,6 +99,7 @@ class Object:
         response = client.get(self.export_url, params={
             "q": [self.id]  # Object must have an id field to be exported
         })
+        response.raise_for_status()
 
         with open(path, "w", encoding="utf-8") as f:
             f.write(response.text)
