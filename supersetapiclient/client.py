@@ -1,5 +1,6 @@
 """A Superset REST Api Client."""
 import logging
+from typing import Union, Tuple
 from functools import partial
 
 import requests
@@ -92,7 +93,7 @@ class SupersetClient:
             urls.append(u)
         return "/".join(urls)
 
-    def authenticate(self) -> tuple[str, str | None]:
+    def authenticate(self) -> Tuple[str, Union[str, None]]:
         # Try authentication and define session
         response = self.session.post(self.login_endpoint, json={
             "username": self.username,
