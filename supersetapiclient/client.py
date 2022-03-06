@@ -1,5 +1,6 @@
 """A Superset REST Api Client."""
 import logging
+from typing import Union, Tuple
 from functools import partial
 
 import requests
@@ -30,17 +31,7 @@ class SupersetClient:
         self.session = requests.Session()
         self.verify = verify
 
-        # Try authentication and define session
-        response = self.session.post(self.login_endpoint, json={
-            "username": self.username,
-            "password": self._password,
-            "provider": "db",
-            "refresh": "true"
-        }, verify=self.verify)
-        response.raise_for_status()
-        tokens = response.json()
-        self._token = tokens.get("access_token")
-        self.refresh_token = tokens.get("refresh_token")
+        self._token, self.refresh_token = self.authenticate()
 
         # Get CSRF Token
         self._csrf_token = None
@@ -101,6 +92,18 @@ class SupersetClient:
                 u = u[:-1]
             urls.append(u)
         return "/".join(urls)
+
+    def authenticate(self) -> Tuple[str, Union[str, None]]:
+        # Try authentication and define session
+        response = self.session.post(self.login_endpoint, json={
+            "username": self.username,
+            "password": self._password,
+            "provider": "db",
+            "refresh": "true"
+        }, verify=self.verify)
+        response.raise_for_status()
+        tokens = response.json()
+        return tokens.get("access_token"), tokens.get("refresh_token")
 
     @property
     def password(self) -> str:
