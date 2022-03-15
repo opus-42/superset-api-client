@@ -258,7 +258,7 @@ class ObjectFactories:
 
         return object
 
-    def find(self,page_size, **kwargs):
+    def find(self,page_size= 100, **kwargs):
         """Find and get objects from api."""
         url = self.base_url
 
