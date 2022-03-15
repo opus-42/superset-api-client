@@ -279,7 +279,7 @@ class ObjectFactories:
                 "q": json.dumps(query)
             }
         else:
-            query = {"page_size": page_size,"page": page}
+            query = {"page_size": page_size, "page": page}
             params = {
                 "q": json.dumps(query)
             }
