@@ -258,7 +258,7 @@ class ObjectFactories:
 
         return object
 
-    def find(self, page_size=100, **kwargs):
+    def find(self, page_size=100, page=0, **kwargs):
         """Find and get objects from api."""
         url = self.base_url
 
@@ -272,13 +272,14 @@ class ObjectFactories:
                         "value": v
                     } for k, v in kwargs.items()
                 ],
-                "page_size": page_size
+                "page_size": page_size,
+                "page": page
             }
             params = {
                 "q": json.dumps(query)
             }
         else:
-            query = {"page_size": page_size}
+            query = {"page_size": page_size,"page": page}
             params = {
                 "q": json.dumps(query)
             }
