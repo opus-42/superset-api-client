@@ -266,11 +266,11 @@ class ObjectFactories:
         query = {
                 "page_size": page_size,
                 "page": page,
-                'filters': [
+                "filters": [
                     {
-                        'col': k,
-                        'opr': 'eq',
-                       'value': v
+                        "col": k,
+                        "opr": "eq",
+                        "value": v
                     } for k, v in kwargs.items()
                 ]
         }
