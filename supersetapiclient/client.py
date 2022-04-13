@@ -21,7 +21,7 @@ class SupersetClient:
         host,
         username,
         password,
-        provider='db',
+        provider="db",
         verify=True,
     ):
         self.host = host
