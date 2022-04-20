@@ -21,12 +21,14 @@ class SupersetClient:
         host,
         username,
         password,
+        provider="db",
         verify=True,
     ):
         self.host = host
         self.base_url = self.join_urls(host, "/api/v1")
         self.username = username
         self._password = password
+        self.provider = provider
         self.session = requests.Session()
         self.verify = verify
 
@@ -97,7 +99,7 @@ class SupersetClient:
         response = self.session.post(self.login_endpoint, json={
             "username": self.username,
             "password": self._password,
-            "provider": "db",
+            "provider": self.provider,
             "refresh": "true"
         }, verify=self.verify)
         response.raise_for_status()
