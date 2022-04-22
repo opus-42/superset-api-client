@@ -1,6 +1,6 @@
 """A Superset REST Api Client."""
 import logging
-from typing import Union, Tuple
+from typing import Union, Tuple, Dict
 from functools import partial
 
 import requests
@@ -78,7 +78,8 @@ class SupersetClient:
         self.datasets = Datasets(self)
         self.databases = Databases(self)
 
-    def join_urls(self, *args) -> str:
+    @staticmethod
+    def join_urls(*args) -> str:
         """Join multiple urls together.
 
         Returns:
@@ -128,7 +129,7 @@ class SupersetClient:
         return self._csrf_token
 
     @property
-    def _headers(self) -> str:
+    def _headers(self) -> Dict[str, str]:
         return {
             "authorization": f"Bearer {self.token}",
             "X-CSRFToken": f"{self.csrf_token}",
