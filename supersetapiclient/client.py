@@ -4,6 +4,7 @@ from typing import Union, Tuple
 from functools import partial
 
 import requests
+import getpass
 
 from supersetapiclient.dashboards import Dashboards
 from supersetapiclient.charts import Charts
@@ -19,15 +20,15 @@ class SupersetClient:
     def __init__(
         self,
         host,
-        username,
-        password,
+        username=None,
+        password=None,
         provider="db",
         verify=True,
     ):
         self.host = host
         self.base_url = self.join_urls(host, "/api/v1")
-        self.username = username
-        self._password = password
+        self.username = getpass.getuser() if username is None else username
+        self._password = getpass.getpass() if password is None else password
         self.provider = provider
         self.session = requests.Session()
         self.verify = verify
