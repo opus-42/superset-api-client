@@ -1,5 +1,6 @@
 ### Superset ###
 .superset
+.vscode
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
