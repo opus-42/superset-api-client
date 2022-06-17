@@ -20,7 +20,8 @@ class SavedQuery(Object):
     @classmethod
     def from_json(cls, json: dict):
         res = super().from_json(json)
-        if database := json.get("database"):
+        database = json.get("database")
+        if database:
             res.db_id = database.get("id")
         return res
 
