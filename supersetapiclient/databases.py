@@ -25,6 +25,11 @@ class Database(Object):
     server_cert: str = default_string()
     sqlalchemy_uri: str = default_string()
 
+    def run(self, query, query_limit=None):
+        return self._parent.client.run(
+            database_id=self.id, query=query, query_limit=query_limit
+        )
+
 
 class Databases(ObjectFactories):
     endpoint = "/database/"

@@ -108,6 +108,36 @@ class SupersetClient:
         tokens = response.json()
         return tokens.get("access_token"), tokens.get("refresh_token")
 
+    def run(self, database_id, query, query_limit=None):
+        """Sends SQL queries to Superset and returns the resulting dataset.
+
+        :param database_id: Database ID of DB to query
+        :type database_id: int
+        :param query: Valid SQL Query
+        :type query: str
+        :param query_limit: limit size of resultset, defaults to -1
+        :type query_limit: int, optional
+        :raises Exception: Query exception
+        :return: Resultset
+        :rtype: tuple(dict)
+        """
+        payload = {
+            "database_id": database_id,
+            "sql": query,
+        }
+        if query_limit:
+            payload["queryLimit"] = query_limit
+        response = self.post(
+            self.join_urls(
+                self.host,
+                "superset/sql_json/",
+            ),
+            json=payload,
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result["columns"], result["data"]
+
     @property
     def password(self) -> str:
         return "*" * len(self._password)

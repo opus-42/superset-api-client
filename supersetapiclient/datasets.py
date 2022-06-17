@@ -16,6 +16,23 @@ class Dataset(Object):
     schema: str = ""
     columns: list = field(default_factory=list)
     description: str = ""
+    kind: str = ""
+    database_id: int = None
+    sql: str = ""
+
+    @classmethod
+    def from_json(cls, json: dict):
+        res = super().from_json(json)
+        if database := json.get("database"):
+            res.db_id = database.get("id")
+        return res
+
+    def run(self, query_limit=None):
+        if not self.sql:
+            raise ValueError("Cannot run a dataset with no SQL")
+        return self._parent.client.run(
+            database_id=self.database_id, query=self.sql, query_limit=query_limit
+        )
 
 
 class Datasets(ObjectFactories):
