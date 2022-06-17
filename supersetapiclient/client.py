@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 class SupersetClient:
     """A Superset Client."""
+    dashboards_cls = Dashboards
+    charts_cls = Charts
+    datasets_cls = Datasets
+    databases_cls = Databases
+    saved_queries_cls = SavedQueries
 
     def __init__(
         self,
@@ -73,11 +78,11 @@ class SupersetClient:
         )
 
         # Related Objects
-        self.dashboards = Dashboards(self)
-        self.charts = Charts(self)
-        self.datasets = Datasets(self)
-        self.databases = Databases(self)
-        self.saved_queries = SavedQueries(self)
+        self.dashboards = self.dashboards_cls(self)
+        self.charts = self.charts_cls(self)
+        self.datasets = self.datasets_cls(self)
+        self.databases = self.databases_cls(self)
+        self.saved_queries = self.saved_queries_cls(self)
 
     def join_urls(self, *args) -> str:
         """Join multiple urls together.
