@@ -1,9 +1,8 @@
 """A Superset REST Api Client."""
 import logging
-from typing import Union, Tuple
 from functools import partial
 
-import requests
+import requests_oauthlib
 
 from supersetapiclient.dashboards import Dashboards
 from supersetapiclient.charts import Charts
@@ -29,10 +28,11 @@ class SupersetClient:
         self.username = username
         self._password = password
         self.provider = provider
-        self.session = requests.Session()
         self.verify = verify
 
-        self._token, self.refresh_token = self.authenticate()
+        token = self.authenticate()
+        self.session = requests_oauthlib.OAuth2Session(token=token)
+        self.session.hooks['response'] = [self.token_refresher]
 
         # Get CSRF Token
         self._csrf_token = None
@@ -94,7 +94,7 @@ class SupersetClient:
             urls.append(u)
         return "/".join(urls)
 
-    def authenticate(self) -> Tuple[str, Union[str, None]]:
+    def authenticate(self) -> dict:
         # Try authentication and define session
         response = self.session.post(self.login_endpoint, json={
             "username": self.username,
@@ -103,8 +103,22 @@ class SupersetClient:
             "refresh": "true"
         }, verify=self.verify)
         response.raise_for_status()
-        tokens = response.json()
-        return tokens.get("access_token"), tokens.get("refresh_token")
+        return response.json()
+
+    def token_refresher(self, r, *args, **kwargs):
+        """A requests response hook that refreshes the access token if needed"""
+        if r.status_code == 401:
+            refresh_token = self.session.token["refresh_token"]
+            tmp_token = {"access_token": refresh_token}
+            # Create a new session to avoid messing up the current session
+            refresh_r = requests_oauthlib.OAuth2Session(token=tmp_token).post(self.refresh_endpoint)
+            refresh_r.raise_for_status()
+            new_token = refresh_r.json()
+            if "refresh_token" not in new_token:
+                new_token["refresh_token"] = refresh_token
+            self.session.token = new_token
+            r.request.headers["Authorization"] = f"Bearer {new_token['access_token']}"
+            return self.session.send(r.request, verify=False)
 
     @property
     def password(self) -> str:
@@ -119,17 +133,12 @@ class SupersetClient:
         return self.join_urls(self.base_url, "/security/refresh")
 
     @property
-    def token(self) -> str:
-        return self._token
-
-    @property
     def csrf_token(self) -> str:
         return self._csrf_token
 
     @property
-    def _headers(self) -> str:
+    def _headers(self) -> dict:
         return {
-            "authorization": f"Bearer {self.token}",
             "X-CSRFToken": f"{self.csrf_token}",
             "Referer": f"{self.base_url}"
         }
