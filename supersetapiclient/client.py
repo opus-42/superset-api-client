@@ -2,6 +2,7 @@
 import logging
 from functools import partial
 
+import requests.exceptions
 import requests_oauthlib
 
 from supersetapiclient.dashboards import Dashboards
@@ -108,6 +109,12 @@ class SupersetClient:
     def token_refresher(self, r, *args, **kwargs):
         """A requests response hook that refreshes the access token if needed"""
         if r.status_code == 401:
+            try:
+                msg = r.json().get("msg")
+            except requests.exceptions.JSONDecodeError:
+                return r
+            if msg != "Token has expired":
+                return r
             refresh_token = self.session.token["refresh_token"]
             tmp_token = {"access_token": refresh_token}
             # Create a new session to avoid messing up the current session
@@ -119,6 +126,7 @@ class SupersetClient:
             self.session.token = new_token
             r.request.headers["Authorization"] = f"Bearer {new_token['access_token']}"
             return self.session.send(r.request, verify=False)
+        return r
 
     @property
     def password(self) -> str:
