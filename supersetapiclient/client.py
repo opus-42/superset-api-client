@@ -103,7 +103,7 @@ class SupersetClient:
         # Try authentication and define session
         if self.username is None:
             self.username = getpass.getuser()
-        if password is None:
+        if self._password is None:
             self._password = getpass.getpass()
 
         response = self.session.post(self.login_endpoint, json={
