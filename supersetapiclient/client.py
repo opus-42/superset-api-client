@@ -1,6 +1,8 @@
 """A Superset REST Api Client."""
+import getpass
 import logging
 from functools import partial
+from typing import Dict
 
 import requests.exceptions
 import requests_oauthlib
@@ -9,6 +11,7 @@ from supersetapiclient.dashboards import Dashboards
 from supersetapiclient.charts import Charts
 from supersetapiclient.datasets import Datasets
 from supersetapiclient.databases import Databases
+from supersetapiclient.saved_queries import SavedQueries
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +22,15 @@ class SupersetClient:
     def __init__(
         self,
         host,
-        username,
-        password,
+        username=None,
+        password=None,
         provider="db",
         verify=True,
     ):
         self.host = host
         self.base_url = self.join_urls(host, "/api/v1")
-        self.username = username
-        self._password = password
+        self.username = getpass.getuser() if username is None else username
+        self._password = getpass.getpass() if password is None else password
         self.provider = provider
         self.verify = verify
 
@@ -77,8 +80,10 @@ class SupersetClient:
         self.charts = Charts(self)
         self.datasets = Datasets(self)
         self.databases = Databases(self)
+        self.saved_queries = SavedQueries(self)
 
-    def join_urls(self, *args) -> str:
+    @staticmethod
+    def join_urls(*args) -> str:
         """Join multiple urls together.
 
         Returns:
@@ -145,7 +150,7 @@ class SupersetClient:
         return self._csrf_token
 
     @property
-    def _headers(self) -> dict:
+    def _headers(self) -> Dict[str, str]:
         return {
             "X-CSRFToken": f"{self.csrf_token}",
             "Referer": f"{self.base_url}"
