@@ -29,8 +29,7 @@ class SupersetClient:
     ):
         self.host = host
         self.base_url = self.join_urls(host, "/api/v1")
-        self.username = getpass.getuser() if username is None else username
-        self._password = getpass.getpass() if password is None else password
+        self._password = password
         self.provider = provider
         self.verify = verify
 
@@ -102,6 +101,11 @@ class SupersetClient:
 
     def authenticate(self) -> dict:
         # Try authentication and define session
+        if self.username is None:
+            self.username = getpass.getuser()
+        if password is None:
+            self._password = getpass.getpass()
+
         response = self.session.post(self.login_endpoint, json={
             "username": self.username,
             "password": self._password,
