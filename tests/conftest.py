@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
-import requests_mock
+import requests_mock  # noqa
 
 from supersetapiclient.client import SupersetClient
 
@@ -15,7 +15,7 @@ API_MOCKS = Path(__file__).parent / "mocks" / "endpoints"
 
 
 @pytest.fixture
-def permanent_requests(requests_mock):
+def permanent_requests(requests_mock): # noqa
 
     # List domain in folder
     for domain in API_MOCKS.iterdir():
@@ -30,15 +30,16 @@ def permanent_requests(requests_mock):
                     endpoint_name, action = endpoint.name.split(".")
 
                     # Register mock on action within domain and endpoint
-                    api_url = f"{SUPERSET_API_URI}/{domain_name}/{endpoint_name}"
+                    url = f"{SUPERSET_API_URI}/{domain_name}/{endpoint_name}"
                     getattr(requests_mock, action)(
-                        url=api_url,
+                        url=url,
                         json=json.load(endpoint.open())
                     )
                     getattr(requests_mock, action)(
-                        url=f"{api_url}/",
+                        url=f"{url}/",
                         json=json.load(endpoint.open())
                     )
+
 
 @pytest.fixture
 def client(permanent_requests):
@@ -49,4 +50,3 @@ def client(permanent_requests):
         "test"
     )
     yield client
-

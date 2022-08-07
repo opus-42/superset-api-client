@@ -121,8 +121,10 @@ class SupersetClient:
         return response.json()
 
     def token_refresher(self, r, *args, **kwargs):
-        """A requests response hook that refreshes the access token if needed"""
+        """A requests response hook for token refresh."""
         if r.status_code == 401:
+
+            # Check if token has expired
             try:
                 msg = r.json().get("msg")
             except requests.exceptions.JSONDecodeError:
@@ -131,14 +133,22 @@ class SupersetClient:
                 return r
             refresh_token = self.session.token["refresh_token"]
             tmp_token = {"access_token": refresh_token}
+
             # Create a new session to avoid messing up the current session
-            refresh_r = requests_oauthlib.OAuth2Session(token=tmp_token).post(self.refresh_endpoint)
+            refresh_r = requests_oauthlib.OAuth2Session(
+                token=tmp_token
+            ).post(self.refresh_endpoint)
             refresh_r.raise_for_status()
+
             new_token = refresh_r.json()
             if "refresh_token" not in new_token:
                 new_token["refresh_token"] = refresh_token
             self.session.token = new_token
-            r.request.headers["Authorization"] = f"Bearer {new_token['access_token']}"
+
+            # Set new authorization header
+            bearer = f"Bearer {new_token['access_token']}"
+            r.request.headers["Authorization"] = bearer
+
             return self.session.send(r.request, verify=False)
         return r
 

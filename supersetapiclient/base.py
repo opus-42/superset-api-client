@@ -305,7 +305,7 @@ class ObjectFactories:
         response.raise_for_status()
 
         json = response.json()
-        return(json['count'])
+        return (json['count'])
 
     def find_one(self, **kwargs):
         """Find only object or raise an Exception."""
