@@ -34,12 +34,13 @@ class SupersetClient:
     ):
         self.host = host
         self.base_url = self.join_urls(host, "/api/v1")
+        self.username = username
         self._password = password
         self.provider = provider
         self.verify = verify
 
-        token = self.authenticate()
-        self.session = requests_oauthlib.OAuth2Session(token=token)
+        self._token = self.authenticate()
+        self.session = requests_oauthlib.OAuth2Session(token=self._token)
         self.session.hooks['response'] = [self.token_refresher]
 
         # Get CSRF Token
@@ -111,7 +112,8 @@ class SupersetClient:
         if self._password is None:
             self._password = getpass.getpass()
 
-        response = self.session.post(self.login_endpoint, json={
+        # No need for session here because we are before authentication
+        response = requests.post(self.login_endpoint, json={
             "username": self.username,
             "password": self._password,
             "provider": self.provider,

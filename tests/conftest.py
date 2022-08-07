@@ -9,7 +9,7 @@ from supersetapiclient.client import SupersetClient
 
 # Testing configuration
 SUPERSET_HOST = "localhost"
-SUPERSET_BASE_URI = f"http://{SUPERSET_HOST}"
+SUPERSET_BASE_URI = f"https://{SUPERSET_HOST}"
 SUPERSET_API_URI = f"{SUPERSET_BASE_URI}/api/v1"
 API_MOCKS = Path(__file__).parent / "mocks" / "endpoints"
 
