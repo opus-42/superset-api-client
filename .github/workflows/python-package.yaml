@@ -23,6 +23,6 @@ jobs:
         run: |
           # fully comply to pep8
           flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
-      # - name: Test with pytest
-      #   run: |
-      #     pytest
+      - name: Test with pytest
+        run: |
+          pytest tests
