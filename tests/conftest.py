@@ -1,58 +1,52 @@
 """Fixture and superset app for testing."""
-from functools import partial
-import os
+import json
 from pathlib import Path
 
 import pytest
+import requests_mock  # noqa
 
-from superset.app import create_app
 from supersetapiclient.client import SupersetClient
 
-# Launch and configure local superset application
-path = Path(__file__).parent / "superset_test_config.py"
-os.environ["SUPERSET_CONFIG_PATH"] = str(path.resolve())
+# Testing configuration
+SUPERSET_HOST = "localhost"
+SUPERSET_BASE_URI = f"https://{SUPERSET_HOST}"
+SUPERSET_API_URI = f"{SUPERSET_BASE_URI}/api/v1"
+API_MOCKS = Path(__file__).parent / "mocks" / "endpoints"
 
 
-@pytest.fixture(scope="session")
-def test_client():
-    app = create_app()
+@pytest.fixture
+def permanent_requests(requests_mock): # noqa
 
-    with app.test_client() as client:
-        with app.app_context() as app_context:  # noqa
-            admin = app.appbuilder.sm.find_role("Admin")
-            app.appbuilder.sm.add_user(
-                username="test",
-                first_name="test",
-                last_name="test",
-                email="test",
-                role=admin)
+    # List domain in folder
+    for domain in API_MOCKS.iterdir():
+        domain_name = domain.name
 
-            yield client
+        if domain.is_dir():
+
+            # List file in dir
+            for endpoint in domain.iterdir():
+                if endpoint.is_file():
+
+                    endpoint_name, action = endpoint.name.split(".")
+
+                    # Register mock on action within domain and endpoint
+                    url = f"{SUPERSET_API_URI}/{domain_name}/{endpoint_name}"
+                    getattr(requests_mock, action)(
+                        url=url,
+                        json=json.load(endpoint.open())
+                    )
+                    getattr(requests_mock, action)(
+                        url=f"{url}/",
+                        json=json.load(endpoint.open())
+                    )
 
 
-@pytest.fixture(scope="session")
-def client(test_client):
+@pytest.fixture
+def client(permanent_requests):
 
     client = SupersetClient(
-        "http://localhost",
+        SUPERSET_BASE_URI,
         "test",
         "test"
     )
-
-    # Patch requests
-    client.get = partial(
-        test_client.get,
-        client._headers
-    )
-    client.put = partial(
-        test_client.put,
-        client._headers
-    )
-    client.post = partial(
-        test_client.post,
-        client._headers
-    )
-    client.delete = partial(
-        test_client.delete,
-        client._headers
-    )
+    yield client
