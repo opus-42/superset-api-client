@@ -173,13 +173,7 @@ class SupersetClient:
         }
         if query_limit:
             payload["queryLimit"] = query_limit
-        response = self.post(
-            self.join_urls(
-                self.host,
-                "superset/sql_json/",
-            ),
-            json=payload,
-        )
+        response = self.post(self._sql_endpoint, json=payload)
         response.raise_for_status()
         result = response.json()
         return result["columns"], result["data"]
@@ -195,6 +189,10 @@ class SupersetClient:
     @property
     def refresh_endpoint(self) -> str:
         return self.join_urls(self.base_url, "/security/refresh")
+
+    @property
+    def _sql_endpoint(self) -> str:
+        return self.join_urls(self.host, "superset/sql_json/")
 
     @property
     def csrf_token(self) -> str:
