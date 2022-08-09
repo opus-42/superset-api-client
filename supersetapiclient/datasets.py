@@ -25,7 +25,7 @@ class Dataset(Object):
         res = super().from_json(json)
         database = json.get("database")
         if database:
-            res.db_id = database.get("id")
+            res.database_id = database.get("id")
         return res
 
     def run(self, query_limit=None):
