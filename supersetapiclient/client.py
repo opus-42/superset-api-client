@@ -12,6 +12,7 @@ from supersetapiclient.charts import Charts
 from supersetapiclient.datasets import Datasets
 from supersetapiclient.databases import Databases
 from supersetapiclient.saved_queries import SavedQueries
+from supersetapiclient.exceptions import QueryLimitReached
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +177,16 @@ class SupersetClient:
         response = self.post(self._sql_endpoint, json=payload)
         response.raise_for_status()
         result = response.json()
+        display_limit = result.get("displayLimit", None)
+        display_limit_reached = result.get("displayLimitReached", False)
+        if display_limit_reached:
+            raise QueryLimitReached(
+                f"You have exceeded the maximum number of rows that can be "
+                f"returned ({display_limit}). Either set the `query_limit` "
+                f"attribute to a lower number than this, or add LIMIT / OFFSET "
+                f"keywords to your SQL statement to limit the number of rows "
+                f"returned."
+            )
         return result["columns"], result["data"]
 
     @property
