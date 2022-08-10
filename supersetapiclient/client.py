@@ -12,6 +12,7 @@ from supersetapiclient.charts import Charts
 from supersetapiclient.datasets import Datasets
 from supersetapiclient.databases import Databases
 from supersetapiclient.saved_queries import SavedQueries
+from supersetapiclient.exceptions import QueryLimitReached
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,40 @@ class SupersetClient:
             return self.session.send(r.request, verify=False)
         return r
 
+    def run(self, database_id, query, query_limit=None):
+        """Sends SQL queries to Superset and returns the resulting dataset.
+
+        :param database_id: Database ID of DB to query
+        :type database_id: int
+        :param query: Valid SQL Query
+        :type query: str
+        :param query_limit: limit size of resultset, defaults to -1
+        :type query_limit: int, optional
+        :raises Exception: Query exception
+        :return: Resultset
+        :rtype: tuple(dict)
+        """
+        payload = {
+            "database_id": database_id,
+            "sql": query,
+        }
+        if query_limit:
+            payload["queryLimit"] = query_limit
+        response = self.post(self._sql_endpoint, json=payload)
+        response.raise_for_status()
+        result = response.json()
+        display_limit = result.get("displayLimit", None)
+        display_limit_reached = result.get("displayLimitReached", False)
+        if display_limit_reached:
+            raise QueryLimitReached(
+                f"You have exceeded the maximum number of rows that can be "
+                f"returned ({display_limit}). Either set the `query_limit` "
+                f"attribute to a lower number than this, or add LIMIT / OFFSET "
+                f"keywords to your SQL statement to limit the number of rows "
+                f"returned."
+            )
+        return result["columns"], result["data"]
+
     @property
     def password(self) -> str:
         return "*" * len(self._password)
@@ -165,6 +200,10 @@ class SupersetClient:
     @property
     def refresh_endpoint(self) -> str:
         return self.join_urls(self.base_url, "/security/refresh")
+
+    @property
+    def _sql_endpoint(self) -> str:
+        return self.join_urls(self.host, "superset/sql_json/")
 
     @property
     def csrf_token(self) -> str:

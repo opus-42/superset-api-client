@@ -25,6 +25,11 @@ class SavedQuery(Object):
             res.db_id = database.get("id")
         return res
 
+    def run(self, query_limit=None):
+        return self._parent.client.run(
+            database_id=self.db_id, query=self.sql, query_limit=query_limit
+        )
+
 
 class SavedQueries(ObjectFactories):
     endpoint = "/saved_query/"
