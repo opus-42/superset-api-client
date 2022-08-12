@@ -11,6 +11,7 @@ class Chart(Object):
     JSON_FIELDS = [
         "params"
     ]
+    LIST_OF_OBJECT_FIELDS = {}
 
     id: int
     description: default_string()

@@ -9,6 +9,7 @@ from supersetapiclient.base import (
 @dataclass
 class Database(Object):
     JSON_FIELDS = ["metadata_cache_timeout"]
+    LIST_OF_OBJECT_FIELDS = {}
 
     id: int
     database_name: str

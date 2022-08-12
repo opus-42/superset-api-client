@@ -25,6 +25,7 @@ class Object:
     _parent = None
     EXPORTABLE = False
     JSON_FIELDS = []
+    JSON_AS_OBJECT_FIELDS = {}
 
     @classmethod
     def fields(cls):
@@ -50,7 +51,15 @@ class Object:
             Object: return the related object
         """
         field_names = cls.field_names()
-        return cls(**{k: v for k, v in json.items() if k in field_names})
+        new_object = cls(**{k: v for k, v in json.items() if k in field_names})
+
+        for field_name, clazz in new_object.JSON_AS_OBJECT_FIELDS.items():
+            new_list = []
+            for subobject_json in json[field_name]:
+                new_subobject = clazz.from_json(subobject_json)
+                new_list.append(new_subobject)
+            setattr(new_object, field_name, new_list)
+        return new_object
 
     def __post_init__(self):
         for f in self.JSON_FIELDS:

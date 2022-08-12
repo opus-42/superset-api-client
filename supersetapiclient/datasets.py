@@ -9,6 +9,7 @@ from supersetapiclient.base import (
 @dataclass
 class Dataset(Object):
     JSON_FIELDS = []
+    LIST_OF_OBJECT_FIELDS = {}
     EXPORTABLE = True
 
     id: int
