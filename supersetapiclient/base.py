@@ -1,6 +1,11 @@
 """Base classes."""
 import logging
 import dataclasses
+try:
+    from functools import cached_property
+except ImportError:
+    # Python<3.8
+    from cached_property import cached_property
 import json
 from typing import List, Union
 from pathlib import Path
@@ -152,9 +157,11 @@ class ObjectFactories:
         """
         self.client = client
 
+    @cached_property
+    def _infos(self):
         # Get infos
-        response = client.get(
-            client.join_urls(
+        response = self.client.get(
+            self.client.join_urls(
                 self.base_url,
                 "_info",
             ),
@@ -166,34 +173,21 @@ class ObjectFactories:
             logger.error(f"Unable to build object factory for {self.endpoint}")
             response.raise_for_status()
 
-        infos = response.json()
-        self.edit_columns = [
+        return response.json()
+
+    @property
+    def add_columns(self):
+        return [
             e.get("name")
-            for e in infos.get("edit_columns", [])
+            for e in self._infos.get("add_columns", [])
         ]
-        #
-        # Need to find a solution
-        #
-        # Due to the design of the superset API,
-        # get /chart/_info only returns 'slice_name'
-        # for chart adds to work,
-        # we require the additional attributes:
-        #   'datasource_id',
-        #   'datasource_type'
-        if self.__class__.__name__ == 'Charts':
-            self.add_columns = [
-                'datasource_id',
-                'datasource_type',
-                'slice_name',
-                'params',
-                'viz_type',
-                'description'
-            ]
-        else:
-            self.add_columns = [
-                e.get("name")
-                for e in infos.get("add_columns", [])
-            ]
+
+    @property
+    def edit_columns(self):
+        return [
+            e.get("name")
+            for e in self._infos.get("edit_columns", [])
+        ]
 
     @property
     def base_url(self):
