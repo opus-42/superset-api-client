@@ -140,7 +140,7 @@ class Object:
 
 class ObjectFactories:
     endpoint = ""
-    base_object = None
+    base_object: Object = None
 
     _INFO_QUERY = {
         "keys": [
@@ -258,15 +258,15 @@ class ObjectFactories:
 
         # Get response
         query = {
-                "page_size": page_size,
-                "page": page,
-                "filters": [
-                    {
-                        "col": k,
-                        "opr": "eq",
-                        "value": v
-                    } for k, v in kwargs.items()
-                ]
+            "page_size": page_size,
+            "page": page,
+            "filters": [
+                {
+                    "col": k,
+                    "opr": "eq",
+                    "value": v
+                } for k, v in kwargs.items()
+            ]
         }
 
         params = {

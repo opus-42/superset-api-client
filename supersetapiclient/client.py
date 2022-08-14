@@ -183,7 +183,7 @@ class SupersetClient:
             raise QueryLimitReached(
                 f"You have exceeded the maximum number of rows that can be "
                 f"returned ({display_limit}). Either set the `query_limit` "
-                f"attribute to a lower number than this, or add LIMIT / OFFSET "
+                f"attribute to a lower number than this, or add LIMIT "
                 f"keywords to your SQL statement to limit the number of rows "
                 f"returned."
             )

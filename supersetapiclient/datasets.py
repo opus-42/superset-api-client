@@ -32,7 +32,9 @@ class Dataset(Object):
         if not self.sql:
             raise ValueError("Cannot run a dataset with no SQL")
         return self._parent.client.run(
-            database_id=self.database_id, query=self.sql, query_limit=query_limit
+            database_id=self.database_id,
+            query=self.sql,
+            query_limit=query_limit
         )
 
 
