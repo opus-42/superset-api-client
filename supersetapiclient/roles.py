@@ -8,7 +8,6 @@ from supersetapiclient.base import (
 
 @dataclass
 class Role(Object):
-    EXPORTABLE = True
 
     id: int
     name: str
