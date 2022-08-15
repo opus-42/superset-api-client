@@ -1,9 +1,13 @@
 """A Superset REST Api Client."""
 import getpass
 import logging
-from functools import partial
-from typing import Dict
+try:
+    from functools import cached_property
+except ImportError:
+    # Python<3.8
+    from cached_property import cached_property
 
+import requests.adapters
 import requests.exceptions
 import requests_oauthlib
 
@@ -24,6 +28,7 @@ class SupersetClient:
     datasets_cls = Datasets
     databases_cls = Databases
     saved_queries_cls = SavedQueries
+    http_adapter_cls = None
 
     def __init__(
         self,
@@ -38,48 +43,8 @@ class SupersetClient:
         self.username = username
         self._password = password
         self.provider = provider
-        self.verify = verify
-
-        self._token = self.authenticate()
-        self.session = requests_oauthlib.OAuth2Session(token=self._token)
-        self.session.hooks['response'] = [self.token_refresher]
-
-        # Get CSRF Token
-        self._csrf_token = None
-        csrf_response = self.session.get(
-            self.join_urls(self.base_url, "/security/csrf_token/"),
-            headers=self._headers,
-            verify=self.verify
-        )
-        csrf_response.raise_for_status()  # Check CSRF Token went well
-        self._csrf_token = csrf_response.json().get("result")
-
-        # Update headers
-        self.session.headers.update(
-            self._headers
-        )
-
-        # Bind method
-        self.get = partial(
-            self.session.get,
-            headers=self._headers,
-            verify=self.verify
-        )
-        self.post = partial(
-            self.session.post,
-            headers=self._headers,
-            verify=self.verify
-        )
-        self.put = partial(
-            self.session.put,
-            headers=self._headers,
-            verify=self.verify
-        )
-        self.delete = partial(
-            self.session.delete,
-            headers=self._headers,
-            verify=self.verify
-        )
+        if not verify:
+            self.http_adapter_cls = NoVerifyHTTPAdapter
 
         # Related Objects
         self.dashboards = self.dashboards_cls(self)
@@ -87,6 +52,41 @@ class SupersetClient:
         self.datasets = self.datasets_cls(self)
         self.databases = self.databases_cls(self)
         self.saved_queries = self.saved_queries_cls(self)
+
+    @cached_property
+    def _token(self):
+        return self.authenticate()
+
+    @cached_property
+    def session(self):
+        session = requests_oauthlib.OAuth2Session(token=self._token)
+        session.hooks['response'] = [self.token_refresher]
+        if self.http_adapter_cls:
+            session.mount(self.host, adapter=self.http_adapter_cls())
+
+        # Update headers
+        session.headers.update({
+            "X-CSRFToken": f"{self.csrf_token(session)}",
+            "Referer": f"{self.base_url}"
+        })
+        return session
+
+    # Method shortcuts
+    @property
+    def get(self):
+        return self.session.get
+
+    @property
+    def post(self):
+        return self.session.post
+
+    @property
+    def put(self):
+        return self.session.put
+
+    @property
+    def delete(self):
+        return self.session.delete
 
     @staticmethod
     def join_urls(*args) -> str:
@@ -119,7 +119,7 @@ class SupersetClient:
             "password": self._password,
             "provider": self.provider,
             "refresh": "true"
-        }, verify=self.verify)
+        })
         response.raise_for_status()
         return response.json()
 
@@ -183,7 +183,7 @@ class SupersetClient:
             raise QueryLimitReached(
                 f"You have exceeded the maximum number of rows that can be "
                 f"returned ({display_limit}). Either set the `query_limit` "
-                f"attribute to a lower number than this, or add LIMIT / OFFSET "
+                f"attribute to a lower number than this, or add LIMIT "
                 f"keywords to your SQL statement to limit the number of rows "
                 f"returned."
             )
@@ -205,13 +205,18 @@ class SupersetClient:
     def _sql_endpoint(self) -> str:
         return self.join_urls(self.host, "superset/sql_json/")
 
-    @property
-    def csrf_token(self) -> str:
-        return self._csrf_token
+    def csrf_token(self, session) -> str:
+        # Get CSRF Token
+        csrf_response = session.get(
+            self.join_urls(self.base_url, "/security/csrf_token/"),
+            headers={"Referer": f"{self.base_url}"},
+        )
+        csrf_response.raise_for_status()  # Check CSRF Token went well
+        return csrf_response.json().get("result")
 
-    @property
-    def _headers(self) -> Dict[str, str]:
-        return {
-            "X-CSRFToken": f"{self.csrf_token}",
-            "Referer": f"{self.base_url}"
-        }
+
+class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
+    """An HTTP adapter that ignores TLS validation errors"""
+
+    def cert_verify(self, conn, url, verify, cert):
+        super().cert_verify(conn=conn, url=url, verify=False, cert=cert)

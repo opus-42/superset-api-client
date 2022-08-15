@@ -25,3 +25,20 @@ class Chart(Object):
 class Charts(ObjectFactories):
     endpoint = "/chart/"
     base_object = Chart
+
+    @property
+    def add_columns(self):
+        # Due to the design of the superset API,
+        # get /chart/_info only returns 'slice_name'
+        # For chart adds to work,
+        # we require the additional attributes:
+        #   'datasource_id',
+        #   'datasource_type'
+        return [
+            'datasource_id',
+            'datasource_type',
+            'slice_name',
+            'params',
+            'viz_type',
+            'description'
+        ]
