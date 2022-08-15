@@ -25,7 +25,7 @@ class Object:
     _parent = None
     EXPORTABLE = False
     JSON_FIELDS = []
-    JSON_AS_OBJECT_FIELDS = {}
+    LIST_OF_OBJECT_FIELDS = {}
 
     @classmethod
     def fields(cls):
