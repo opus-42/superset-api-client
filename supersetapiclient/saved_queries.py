@@ -9,7 +9,6 @@ from supersetapiclient.base import (
 @dataclass
 class SavedQuery(Object):
     JSON_FIELDS = []
-    LIST_OF_OBJECT_FIELDS = {}
 
     id: int
     label: str
