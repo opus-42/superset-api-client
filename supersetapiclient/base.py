@@ -53,7 +53,7 @@ class Object:
         field_names = cls.field_names()
         new_object = cls(**{k: v for k, v in json.items() if k in field_names})
 
-        for field_name, clazz in new_object.JSON_AS_OBJECT_FIELDS.items():
+        for field_name, clazz in new_object.LIST_OF_OBJECT_FIELDS.items():
             new_list = []
             for subobject_json in json[field_name]:
                 new_subobject = clazz.from_json(subobject_json)
