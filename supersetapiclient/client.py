@@ -10,6 +10,7 @@ from supersetapiclient.dashboards import Dashboards
 from supersetapiclient.charts import Charts
 from supersetapiclient.datasets import Datasets
 from supersetapiclient.databases import Databases
+from supersetapiclient.roles import Roles
 from supersetapiclient.saved_queries import SavedQueries
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ class SupersetClient:
         self.datasets = Datasets(self)
         self.databases = Databases(self)
         self.saved_queries = SavedQueries(self)
+        self.roles = Roles(self)
 
     @staticmethod
     def join_urls(*args) -> str:

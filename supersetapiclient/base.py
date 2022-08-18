@@ -53,12 +53,13 @@ class Object:
         field_names = cls.field_names()
         new_object = cls(**{k: v for k, v in json.items() if k in field_names})
 
-        for field_name, clazz in new_object.LIST_OF_OBJECT_FIELDS.items():
+        for field_name, class_info in new_object.LIST_OF_OBJECT_FIELDS.items():
             new_list = []
             for subobject_json in json[field_name]:
-                new_subobject = clazz.from_json(subobject_json)
+                new_subobject = class_info["class"].from_json(subobject_json)
                 new_list.append(new_subobject)
             setattr(new_object, field_name, new_list)
+
         return new_object
 
     def __post_init__(self):
@@ -134,6 +135,12 @@ class Object:
 
                 if c in self.JSON_FIELDS:
                     value = json.dumps(value)
+                elif c in self.LIST_OF_OBJECT_FIELDS.keys():
+                    new_value = []
+                    for sub_object in value:
+                        id = getattr(sub_object, self.LIST_OF_OBJECT_FIELDS[c]["identifier"])
+                        new_value.append(id)
+                    value = new_value
                 o[c] = value
 
         response = self._parent.client.put(self.base_url, json=o)
@@ -143,6 +150,8 @@ class Object:
 
 
 class ObjectFactories:
+    READ_ONLY = False
+
     endpoint = ""
     base_object = None
 
@@ -160,6 +169,9 @@ class ObjectFactories:
             client (client): superset client
         """
         self.client = client
+
+        if self.READ_ONLY:
+            return
 
         # Get infos
         response = client.get(
@@ -322,6 +334,11 @@ class ObjectFactories:
         if len(objects) == 0:
             raise NotFound(f"No {self.base_object.__name__} has been found.")
         return objects[0]
+
+    def create(self, *args) -> base_object:
+        object = self.base_object(*args)
+        object._parent = self
+        return object
 
     def add(self, obj) -> int:
         """Create a object on remote."""

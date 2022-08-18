@@ -15,7 +15,10 @@ class Dashboard(Object):
         "position_json"
     ]
     LIST_OF_OBJECT_FIELDS = {
-        "roles": Role
+        "roles": {
+            "class": Role,
+            "identifier": "id"
+        }
     }
 
     EXPORTABLE = True
