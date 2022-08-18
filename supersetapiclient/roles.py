@@ -8,8 +8,6 @@ from supersetapiclient.base import (
 
 @dataclass
 class Role(Object):
-    JSON_FIELDS = []
-    EXPORTABLE = True
 
     id: int
     name: str
