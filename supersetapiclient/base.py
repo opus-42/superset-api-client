@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 from requests import Response, HTTPError
 
-from supersetapiclient.exceptions import NotFound, ServerError
+from supersetapiclient.exceptions import ComplexServerError, NotFound, ServerError
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,11 @@ def raise_for_status(response):
         try:
             error_msg = response.json()["message"]
         except Exception:
-            raise e
+            try:
+                errors = response.json()["errors"]
+            except Exception:
+                raise e
+            raise ComplexServerError(*e.args, request=e.request, response=e.response, errors=errors) from None
         raise ServerError(*e.args, request=e.request, response=e.response, message=error_msg) from None
 
 
