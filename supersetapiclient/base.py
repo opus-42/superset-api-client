@@ -203,7 +203,7 @@ class ObjectFactories:
         return self.client.join_urls(
             self.client.base_url,
             self.endpoint,
-            "import"
+            "import/"
         )
 
     @property
@@ -212,7 +212,7 @@ class ObjectFactories:
         return self.client.join_urls(
             self.client.base_url,
             self.endpoint,
-            "export"
+            "export/"
         )
 
     @property
