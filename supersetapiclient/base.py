@@ -10,6 +10,7 @@ import json
 from typing import List, Union
 from pathlib import Path
 
+import os.path
 import yaml
 from requests import Response
 
@@ -365,18 +366,36 @@ class ObjectFactories:
         else:
             return False
 
-    def import_file(self, file_path) -> int:
-        """Import a file on remote."""
+    def import_file(self, file_path, overwrite=False, passwords=None) -> dict:
+        """Import a file on remote.
+
+        :param file_path: Path to a JSON or ZIP file containing the import data
+        :param overwrite: If True, overwrite existing remote entities
+        :param passwords: JSON map of passwords for each featured database in
+        the file. If the ZIP includes a database config in the path
+        databases/MyDatabase.yaml, the password should be provided in the
+        following format: {"MyDatabase": "my_password"}
+        """
         url = self.import_url
 
-        file = {'formData': (file_path, open(
-            file_path, 'rb'), 'application/json')}
-
-        response = self.client.post(url, files=file)
+        data = {"overwrite": json.dumps(overwrite)}
+        passwords = {
+            f"databases/{db}.yaml": pwd for db, pwd in (passwords or {}).items()
+        }
+        file_name = os.path.split(file_path)[-1]
+        file_ext = os.path.splitext(file_name)[-1].lstrip(".").lower()
+        with open(file_path, "rb") as f:
+            files = {
+                "formData": (file_name, f, f"application/{file_ext}"),
+                "passwords": (None, json.dumps(passwords), None),
+            }
+            response = self.client.post(
+                url, files=files, data=data,
+                headers={"Accept": "application/json"}
+            )
         response.raise_for_status()
 
-        # If import is successful,
-        # the following is returned: {'message': 'OK'}
+        # If import is successful, the following is returned: {'message': 'OK'}
         return response.json()
 
     def test_connection(self, obj):
