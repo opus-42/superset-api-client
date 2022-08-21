@@ -1,11 +1,11 @@
 """Dashboards."""
+from dataclasses import dataclass, field
 from typing import List
-
-from dataclasses import dataclass
 
 from supersetapiclient.base import (
     Object, ObjectFactories, json_field, default_string
 )
+from supersetapiclient.roles import Role
 
 
 @dataclass
@@ -14,6 +14,13 @@ class Dashboard(Object):
         "json_metadata",
         "position_json"
     ]
+    LIST_OF_OBJECT_FIELDS = {
+        "roles": {
+            "class": Role,
+            "identifier": "id"
+        }
+    }
+
     EXPORTABLE = True
 
     id: int
@@ -29,6 +36,7 @@ class Dashboard(Object):
     css: str = default_string()
     changed_on: str = default_string()
     charts: list = default_string()
+    roles: list = field(default_factory=list)
 
     @property
     def colors(self) -> dict:
