@@ -1,0 +1,15 @@
+{
+  "add_columns": {},
+  "edit_columns": {},
+  "filters": {
+    "column_name": [
+      {
+        "name": "string",
+        "operator": "string"
+      }
+    ]
+  },
+  "permissions": [
+    "string"
+  ]
+}
