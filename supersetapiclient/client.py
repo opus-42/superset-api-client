@@ -1,6 +1,7 @@
 """A Superset REST Api Client."""
 import getpass
 import logging
+import os
 try:
     from functools import cached_property
 except ImportError:
