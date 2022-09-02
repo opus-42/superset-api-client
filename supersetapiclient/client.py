@@ -1,7 +1,6 @@
 """A Superset REST Api Client."""
 import getpass
 import logging
-import os
 try:
     from functools import cached_property
 except ImportError:
@@ -208,21 +207,12 @@ class SupersetClient:
 
     def csrf_token(self, session) -> str:
         # Get CSRF Token
-        if self.base_url.startswith('https:'):
-            csrf_response = session.get(
-                self.join_urls(self.base_url, "/security/csrf_token/"),
-                headers={"Referer": f"{self.base_url}"},
-            )
-            csrf_response.raise_for_status()  # Check CSRF Token went well
-            return csrf_response.json().get("result")
-        else:
-            os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-            csrf_response = session.get(
-                self.join_urls(self.base_url, "/security/csrf_token/"),
-                headers={"Referer": f"{self.base_url}"},
-            )
-            csrf_response.raise_for_status()  # Check CSRF Token went well
-            return csrf_response.json().get("result")
+        csrf_response = session.get(
+            self.join_urls(self.base_url, "/security/csrf_token/"),
+            headers={"Referer": f"{self.base_url}"},
+        )
+        csrf_response.raise_for_status()  # Check CSRF Token went well
+        return csrf_response.json().get("result")
 
 
 class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
