@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 from requests import Response, HTTPError
 
-from supersetapiclient.exceptions import ComplexServerError, NotFound, ServerError
+from supersetapiclient.exceptions import ComplexBadRequestError, NotFound, BadRequestError
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +38,8 @@ def raise_for_status(response):
                 errors = response.json()["errors"]
             except Exception:
                 raise e
-            raise ComplexServerError(*e.args, request=e.request, response=e.response, errors=errors) from None
-        raise ServerError(*e.args, request=e.request, response=e.response, message=error_msg) from None
+            raise ComplexBadRequestError(*e.args, request=e.request, response=e.response, errors=errors) from None
+        raise BadRequestError(*e.args, request=e.request, response=e.response, message=error_msg) from None
 
 
 class Object:

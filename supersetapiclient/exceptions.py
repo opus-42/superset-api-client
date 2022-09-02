@@ -12,7 +12,7 @@ class QueryLimitReached(Exception):
     pass
 
 
-class ServerError(HTTPError):
+class BadRequestError(HTTPError):
     def __init__(self, *args, **kwargs):
         self.message = kwargs.pop("message", None)
         super().__init__(*args, **kwargs)
@@ -21,7 +21,7 @@ class ServerError(HTTPError):
         return self.message
 
 
-class ComplexServerError(HTTPError):
+class ComplexBadRequestError(HTTPError):
     def __init__(self, *args, **kwargs):
         self.errors = kwargs.pop("errors", None)
         super().__init__(*args, **kwargs)
