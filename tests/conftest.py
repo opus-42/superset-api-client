@@ -1,8 +1,11 @@
 """Fixture and superset app for testing."""
 import json
+import os
 from pathlib import Path
 
 import pytest
+import requests
+import requests.exceptions
 import requests_mock  # noqa
 
 from supersetapiclient.client import SupersetClient
@@ -50,3 +53,31 @@ def client(permanent_requests):
         "test"
     )
     yield client
+
+
+def is_responsive(url):
+    try:
+        return requests.get(url).status_code == 200
+    except requests.exceptions.ConnectionError:
+        return False
+
+
+@pytest.fixture(scope="session")
+def superset_api(docker_ip, docker_services):
+    """Ensure that Superset API is up and responsive."""
+
+    # `port_for` takes a container port and returns the corresponding host port
+    schema = "http"
+    port = docker_services.port_for("superset", 8080)
+    url = f"{schema}://{docker_ip}:{port}"
+    if schema == "http":
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    docker_services.wait_until_responsive(
+        timeout=600, pause=1.0, check=lambda: is_responsive(url)
+    )
+    yield SupersetClient(url, "admin", "admin")
+
+
+@pytest.fixture(scope="session")
+def docker_compose_file(pytestconfig):
+    return str(Path(__file__).parent.parent / "docker-compose.yml")
