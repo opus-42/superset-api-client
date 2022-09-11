@@ -1,4 +1,8 @@
 # superset-api-client
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![PyPI version](https://badge.fury.io/py/superset-api-client.svg)](https://badge.fury.io/py/superset-api-client)
+[![Coverage Status](https://coveralls.io/repos/github/opus-42/superset-api-client/badge.svg?branch=develop)](https://coveralls.io/github/opus-42/superset-api-client?branch=develop)
+
 A Python Client for Apache Superset REST API.
 
 This is a Alpha version. Stability is not guaranteed.
