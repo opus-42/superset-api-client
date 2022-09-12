@@ -12,9 +12,9 @@ from pathlib import Path
 
 import os.path
 import yaml
-from requests import Response
+from requests import Response, HTTPError
 
-from supersetapiclient.exceptions import NotFound
+from supersetapiclient.exceptions import ComplexBadRequestError, NotFound, BadRequestError
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,22 @@ def json_field():
 
 def default_string():
     return dataclasses.field(default="", repr=False)
+
+
+def raise_for_status(response):
+    try:
+        response.raise_for_status()
+    except HTTPError as e:
+        # Attempt to propagate the server error message
+        try:
+            error_msg = response.json()["message"]
+        except Exception:
+            try:
+                errors = response.json()["errors"]
+            except Exception:
+                raise e
+            raise ComplexBadRequestError(*e.args, request=e.request, response=e.response, errors=errors) from None
+        raise BadRequestError(*e.args, request=e.request, response=e.response, message=error_msg) from None
 
 
 class Object:
@@ -105,7 +121,7 @@ class Object:
         response = client.get(self.export_url, params={
             "q": [self.id]  # Object must have an id field to be exported
         })
-        response.raise_for_status()
+        raise_for_status(response)
 
         with open(path, "w", encoding="utf-8") as f:
             f.write(response.text)
@@ -136,7 +152,7 @@ class Object:
         response = self._parent.client.put(self.base_url, json=o)
         if response.status_code in [400, 422]:
             logger.error(response.text)
-        response.raise_for_status()
+        raise_for_status(response)
 
 
 class ObjectFactories:
@@ -172,7 +188,7 @@ class ObjectFactories:
 
         if response.status_code != 200:
             logger.error(f"Unable to build object factory for {self.endpoint}")
-            response.raise_for_status()
+            raise_for_status(response)
 
         return response.json()
 
@@ -235,7 +251,7 @@ class ObjectFactories:
             logger.error(f"Full API response is {response.text}")
 
         # Finally raising for status
-        response.raise_for_status()
+        raise_for_status(response)
 
     def get(self, id: int):
         """Get an object by id."""
@@ -243,7 +259,7 @@ class ObjectFactories:
         response = self.client.get(
             url
         )
-        response.raise_for_status()
+        raise_for_status(response)
         response = response.json()
 
         object_json = response.get("result")
@@ -278,7 +294,7 @@ class ObjectFactories:
             url,
             params=params
         )
-        response.raise_for_status()
+        raise_for_status(response)
         response = response.json()
 
         objects = []
@@ -297,7 +313,7 @@ class ObjectFactories:
 
         if response.status_code not in (200, 201):
             logger.error(response.text)
-        response.raise_for_status()
+        raise_for_status(response)
 
         json = response.json()
         return (json['count'])
@@ -322,7 +338,7 @@ class ObjectFactories:
                 o[c] = value
 
         response = self.client.post(self.base_url, json=o)
-        response.raise_for_status()
+        raise_for_status(response)
         return response.json().get("id")
 
     def export(self, ids: List[int], path: Union[Path, str]) -> None:
@@ -338,7 +354,7 @@ class ObjectFactories:
 
         if response.status_code not in (200, 201):
             logger.error(response.text)
-        response.raise_for_status()
+        raise_for_status(response)
 
         content_type = response.headers["content-type"].strip()
         if content_type.startswith("application/text"):
@@ -363,7 +379,7 @@ class ObjectFactories:
 
         if response.status_code not in (200, 201):
             logger.error(response.text)
-        response.raise_for_status()
+        raise_for_status(response)
 
         if response.json().get('message') == 'OK':
             return True
@@ -397,7 +413,7 @@ class ObjectFactories:
                 url, files=files, data=data,
                 headers={"Accept": "application/json"}
             )
-        response.raise_for_status()
+        raise_for_status(response)
 
         # If import is successful, the following is returned: {'message': 'OK'}
         return response.json()
