@@ -362,6 +362,10 @@ class ObjectFactories:
             data = yaml.load(data, Loader=yaml.FullLoader)
             with open(path, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False)
+        if content_type.startswith("application/zip"):
+            data = response.content
+            with open(path, 'wb') as f:
+                f.write(data)
         else:
             data = response.json()
             with open(path, 'w', encoding='utf-8') as f:
