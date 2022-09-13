@@ -11,6 +11,7 @@ import requests.adapters
 import requests.exceptions
 import requests_oauthlib
 
+from supersetapiclient.base import raise_for_status
 from supersetapiclient.dashboards import Dashboards
 from supersetapiclient.charts import Charts
 from supersetapiclient.datasets import Datasets
@@ -120,7 +121,7 @@ class SupersetClient:
             "provider": self.provider,
             "refresh": "true"
         })
-        response.raise_for_status()
+        raise_for_status(response)
         return response.json()
 
     def token_refresher(self, r, *args, **kwargs):
@@ -141,7 +142,7 @@ class SupersetClient:
             refresh_r = requests_oauthlib.OAuth2Session(
                 token=tmp_token
             ).post(self.refresh_endpoint)
-            refresh_r.raise_for_status()
+            raise_for_status(refresh_r)
 
             new_token = refresh_r.json()
             if "refresh_token" not in new_token:
@@ -175,7 +176,7 @@ class SupersetClient:
         if query_limit:
             payload["queryLimit"] = query_limit
         response = self.post(self._sql_endpoint, json=payload)
-        response.raise_for_status()
+        raise_for_status(response)
         result = response.json()
         display_limit = result.get("displayLimit", None)
         display_limit_reached = result.get("displayLimitReached", False)
@@ -211,7 +212,7 @@ class SupersetClient:
             self.join_urls(self.base_url, "/security/csrf_token/"),
             headers={"Referer": f"{self.base_url}"},
         )
-        csrf_response.raise_for_status()  # Check CSRF Token went well
+        raise_for_status(csrf_response)  # Check CSRF Token went well
         return csrf_response.json().get("result")
 
 
