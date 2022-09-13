@@ -326,8 +326,7 @@ class ObjectFactories:
 
         content_type = response.headers["content-type"].strip()
         if content_type.startswith("application/text"):
-            data = response.text
-            data = yaml.load(data, Loader=yaml.FullLoader)
+            data = yaml.load(response.text, Loader=yaml.FullLoader)
             with open(path, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False)
         if content_type.startswith("application/zip"):
@@ -384,4 +383,4 @@ class ObjectFactories:
         raise_for_status(response)
 
         # If import is successful, the following is returned: {'message': 'OK'}
-        return response.json()
+        return response.json().get('message') == 'OK'

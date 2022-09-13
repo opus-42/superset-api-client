@@ -56,8 +56,10 @@ class TestClient:
         db.save()
         assert superset_api.databases.get(id=db.id).database_name == "XXX"
 
-        # Test exporting the item
-        db.export(f"/tmp/database_{db.id}.zip")
+        # Test exporting and importing the item
+        file = f"/tmp/database_{db.id}.zip"
+        db.export(file)
+        superset_api.databases.import_file(file, overwrite=True)
 
         # Test deleting the item
         db.delete()
@@ -120,8 +122,10 @@ class TestClient:
         ds.save()
         assert superset_api.datasets.get(id=ds.id).table_name == "XXX"
 
-        # Test exporting the item
-        ds.export(f"/tmp/dataset_{ds.id}.zip")
+        # Test exporting and importing the item
+        file = f"/tmp/dataset_{ds.id}.zip"
+        ds.export(file)
+        superset_api.datasets.import_file(file, overwrite=True)
 
         # Test deleting the item
         ds.delete()
@@ -182,8 +186,10 @@ class TestClient:
         sq.save()
         assert superset_api.saved_queries.get(id=sq.id).label == "XXX"
 
-        # Test exporting the item
-        sq.export(f"/tmp/saved_query_{sq.id}.zip")
+        # Test exporting and importing the item
+        file = f"/tmp/saved_query_{sq.id}.zip"
+        sq.export(file)
+        superset_api.saved_queries.import_file(file, overwrite=True)
 
         # Test deleting the item
         sq.delete()
@@ -230,11 +236,7 @@ class TestClient:
             slice_name="My Test Chart",
             viz_type="table",
         )
-        try:
-            superset_api.charts.add(c)
-        except Exception as e:
-            print(e.__dict__)
-            raise
+        superset_api.charts.add(c)
         assert isinstance(c.id, int)
         assert superset_api.charts.get(id=c.id).slice_name == "My Test Chart"
         assert superset_api.charts.get(id=c.id).viz_type == "table"
@@ -246,8 +248,10 @@ class TestClient:
         c.save()
         assert superset_api.charts.get(id=c.id).slice_name == "XXX"
 
-        # Test exporting the item
-        c.export(f"/tmp/chart_{c.id}.zip")
+        # Test exporting and importing the item
+        file = f"/tmp/chart_{c.id}.zip"
+        c.export(file)
+        superset_api.charts.import_file(file, overwrite=True)
 
         # Test deleting the item
         c.delete()
@@ -275,11 +279,7 @@ class TestClient:
             published=True,
             slug="my_dashboard",
         )
-        try:
-            superset_api.dashboards.add(d)
-        except Exception as e:
-            print(e.__dict__)
-            raise
+        superset_api.dashboards.add(d)
         assert isinstance(d.id, int)
         assert superset_api.dashboards.get(id=d.id).dashboard_title == "My Dashboard"
 
@@ -296,8 +296,10 @@ class TestClient:
         d.save()
         assert superset_api.dashboards.get(id=d.id).dashboard_title == "XXX"
 
-        # Test exporting the item
-        d.export(f"/tmp/dashboard_{d.id}.zip")
+        # Test exporting and importing the item
+        file = f"/tmp/dashboard_{d.id}.zip"
+        d.export(file)
+        superset_api.dashboards.import_file(file, overwrite=True)
 
         # Test deleting the item
         d.delete()
