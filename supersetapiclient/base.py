@@ -74,6 +74,18 @@ class Object:
         field_names = cls.field_names()
         return cls(**{k: v for k, v in json.items() if k in field_names})
 
+    def to_json(self, columns):
+        o = {}
+        for c in columns:
+            if not hasattr(self, c):
+                # Column that is not implemented yet
+                continue
+            value = getattr(self, c)
+            if c in self.JSON_FIELDS:
+                value = json.dumps(value)
+            o[c] = value
+        return o
+
     def __post_init__(self):
         for f in self.JSON_FIELDS:
             setattr(self, f, json.loads(getattr(self, f) or "{}"))
@@ -140,19 +152,14 @@ class Object:
 
     def save(self) -> None:
         """Save object information."""
-        o = {}
-        for c in self._parent.edit_columns:
-            if hasattr(self, c):
-                value = getattr(self, c)
-
-                if c in self.JSON_FIELDS:
-                    value = json.dumps(value)
-                o[c] = value
-
+        o = self.to_json(columns=self._parent.edit_columns)
         response = self._parent.client.put(self.base_url, json=o)
         if response.status_code in [400, 422]:
             logger.error(response.text)
         raise_for_status(response)
+
+    def delete(self) -> bool:
+        return self._parent.delete(id=self.id)
 
 
 class ObjectFactories:
@@ -328,18 +335,12 @@ class ObjectFactories:
     def add(self, obj) -> int:
         """Create a object on remote."""
 
-        o = {}
-        for c in self.add_columns:
-            if hasattr(obj, c):
-                value = getattr(obj, c)
-
-                if c in obj.JSON_FIELDS:
-                    value = json.dumps(value)
-                o[c] = value
-
+        o = obj.to_json(columns=self.add_columns)
         response = self.client.post(self.base_url, json=o)
         raise_for_status(response)
-        return response.json().get("id")
+        obj.id = response.json().get("id")
+        obj._parent = self
+        return obj.id
 
     def export(self, ids: List[int], path: Union[Path, str]) -> None:
         """Export object into an importable file"""
@@ -373,7 +374,7 @@ class ObjectFactories:
 
         return data
 
-    def delete(self, id) -> int:
+    def delete(self, id: int) -> bool:
         """Delete a object on remote."""
         response = self.client.delete(self.base_url + str(id))
 
