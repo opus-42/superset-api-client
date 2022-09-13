@@ -1,5 +1,6 @@
 """Charts."""
 from dataclasses import dataclass
+from typing import Optional
 
 from supersetapiclient.base import (
     Object, ObjectFactories, json_field, default_string
@@ -12,14 +13,13 @@ class Chart(Object):
         "params"
     ]
 
-    id: int
-    description: default_string()
-    slice_name: default_string()
-    params: json_field()
-    datasource_id: int = None
-    datasource_type: str = default_string
-    viz_type: str = ""
+    id: Optional[int] = None
+    description: str = default_string()
+    slice_name: str = default_string()
     params: dict = json_field()
+    datasource_id: Optional[int] = None
+    datasource_type: str = default_string()
+    viz_type: str = ""
 
 
 class Charts(ObjectFactories):

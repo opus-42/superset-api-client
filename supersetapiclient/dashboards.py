@@ -1,7 +1,6 @@
 """Dashboards."""
-from typing import List
-
 from dataclasses import dataclass
+from typing import List, Optional
 
 from supersetapiclient.base import (
     Object, ObjectFactories, json_field, default_string
@@ -16,12 +15,11 @@ class Dashboard(Object):
     ]
     EXPORTABLE = True
 
-    id: int
     dashboard_title: str
     published: bool
+    id: Optional[int] = None
     json_metadata: dict = json_field()
     position_json: dict = json_field()
-    changed_by: str = default_string()
     changed_by: str = default_string()
     slug: str = default_string()
     changed_by_name: str = default_string()

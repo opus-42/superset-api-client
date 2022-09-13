@@ -1,5 +1,6 @@
 """Saved queries."""
 from dataclasses import dataclass
+from typing import Optional
 
 from supersetapiclient.base import (
     Object, ObjectFactories, default_string
@@ -10,8 +11,8 @@ from supersetapiclient.base import (
 class SavedQuery(Object):
     JSON_FIELDS = []
 
-    id: int
     label: str
+    id: Optional[int] = None
     description: str = default_string()
     sql: str = default_string()
     db_id: int = None
