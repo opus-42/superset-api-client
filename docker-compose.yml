@@ -14,3 +14,10 @@ services:
     volumes:
       - ./scripts/entrypoint.sh:/app/superset_home/entrypoint.sh
       - ./tests/superset_config.py:/app/superset_home/test_config.py
+  postgres:
+    image: postgres:14.1-alpine
+    hostname: pg
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
