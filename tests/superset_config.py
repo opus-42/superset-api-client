@@ -7,8 +7,8 @@ import logging
 from typing import Optional, cast
 
 from cachelib.file import FileSystemCache
-from flask import Response, redirect, request, g
-from flask_appbuilder.api import protect, safe
+from flask import request
+from flask_appbuilder.api import protect
 from flask_appbuilder.views import expose
 from superset.initialization import SupersetAppInitializer
 
