@@ -30,7 +30,27 @@ class Database(Object):
             database_id=self.id, query=query, query_limit=query_limit
         )
 
+    def test_connection(self):
+        return self._parent.test_connection(self)
+
 
 class Databases(ObjectFactories):
     endpoint = "/database/"
     base_object = Database
+
+    @property
+    def test_connection_url(self):
+        """Base url for these objects."""
+        return self.client.join_urls(
+            self.client.base_url,
+            self.endpoint,
+            "test_connection"
+        )
+
+    def test_connection(self, obj):
+        """Test connection to a database"""
+        url = self.test_connection_url
+        connection_columns = ['database_name', 'sqlalchemy_uri']
+        o = {c: getattr(obj, c) for c in connection_columns}
+        response = self.client.post(url, json=o)
+        return response.json().get('message') == 'OK'

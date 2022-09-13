@@ -9,9 +9,6 @@ from supersetapiclient.saved_queries import SavedQuery
 
 
 class TestClient:
-    def test_connection(self, superset_api):
-        assert isinstance(superset_api.databases.find(), list)
-
     def test_databases(self, superset_api):
         # Clean up any leftover items
         for i in superset_api.dashboards.find():
@@ -47,6 +44,9 @@ class TestClient:
         db.id = db_id
         assert exc_info.value.response.status_code == 422
         assert exc_info.value.message == {"database_name": "A database with the same name already exists."}
+
+        # Test connection to DB
+        assert db.test_connection()
 
         # Test running SQL
         assert db.run("CREATE SCHEMA IF NOT EXISTS test_schema") == ([], [])
