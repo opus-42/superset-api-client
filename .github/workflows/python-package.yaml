@@ -24,6 +24,6 @@ jobs:
         run: |
           # fully comply to pep8
           flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
-      - name: Test with pytest
+      - name: Test with pytest and coverage
         run: |
-          pytest tests
+          pytest -cov=supersetapiclient tests
