@@ -17,6 +17,12 @@ SUPERSET_API_URI = f"{SUPERSET_BASE_URI}/api/v1"
 API_MOCKS = Path(__file__).parent / "mocks" / "endpoints"
 
 
+class CustomClient(SupersetClient):
+    @property
+    def _sql_endpoint(self) -> str:
+        return self.join_urls(self.base_url, "execute_sql_json/")
+
+
 @pytest.fixture
 def permanent_requests(requests_mock): # noqa
 
@@ -75,7 +81,7 @@ def superset_api(docker_ip, docker_services):
     docker_services.wait_until_responsive(
         timeout=600, pause=1.0, check=lambda: is_responsive(url)
     )
-    yield SupersetClient(url, "admin", "admin")
+    yield CustomClient(url, "admin", "admin")
 
 
 @pytest.fixture(scope="session")
