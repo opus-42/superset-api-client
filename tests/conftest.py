@@ -81,3 +81,29 @@ def superset_api(docker_ip, docker_services):
 @pytest.fixture(scope="session")
 def docker_compose_file(pytestconfig):
     return str(Path(__file__).parent.parent / "docker-compose.yml")
+
+
+# Fixtures to enable testing without starting and stopping containers on each run.
+# See https://github.com/avast/pytest-docker/issues/46#issuecomment-887408396
+def pytest_addoption(parser):
+    """Add the --keepalive option for pytest."""
+    parser.addoption("--keepalive", "-K", action="store_true", default=False, help="Keep Docker containers alive")
+
+
+@pytest.fixture(scope="session")
+def keepalive(request):
+    return request.config.option.keepalive
+
+
+@pytest.fixture(scope="session")
+def docker_compose_project_name(keepalive, docker_compose_project_name):
+    if keepalive:
+        return "test_superset_app"
+    return docker_compose_project_name
+
+
+@pytest.fixture(scope="session")
+def docker_cleanup(keepalive, docker_cleanup):
+    if keepalive:
+        return "version"
+    return docker_cleanup
