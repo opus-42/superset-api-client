@@ -13,7 +13,6 @@ class Dashboard(Object):
         "json_metadata",
         "position_json"
     ]
-    EXPORTABLE = True
 
     dashboard_title: str
     published: bool

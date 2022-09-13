@@ -45,7 +45,6 @@ def raise_for_status(response):
 
 class Object:
     _parent = None
-    EXPORTABLE = False
     JSON_FIELDS = []
 
     @classmethod
@@ -105,16 +104,6 @@ class Object:
         )
 
     @property
-    def export_url(self) -> str:
-        """Export url for a single object."""
-        # Note that params should be passed on run
-        # to bind to a specific object
-        return self._parent.client.join_urls(
-            self.base_url,
-            "export"
-        )
-
-    @property
     def test_connection_url(self) -> str:
         return self._parent.client.join_urls(
             self._parent.base_url,
@@ -123,20 +112,7 @@ class Object:
 
     def export(self, path: Union[Path, str]) -> None:
         """Export object to path"""
-        if not self.EXPORTABLE:
-            raise NotImplementedError(
-                "Export is not defined for this object."
-            )
-
-        # Get export response
-        client = self._parent.client
-        response = client.get(self.export_url, params={
-            "q": [self.id]  # Object must have an id field to be exported
-        })
-        raise_for_status(response)
-
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(response.text)
+        self._parent.export(ids=[self.id], path=path)
 
     def fetch(self) -> None:
         """Fetch additional object information."""
