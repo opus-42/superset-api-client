@@ -1,7 +1,8 @@
 """File for configuring SuperSet, i.e. the superset_config.py file
 
-This code is based on the solution in https://stackoverflow.com/a/54024394/219640, with added OAuth login for
-the API.
+This config adds an /api/v1/execute_sql_json/ endpoint under OAuth authentication, to
+allow running queries through the API. Standard Superset only has /superset/sql_json/
+which is only accessible via a browser.
 """
 import logging
 from typing import Optional, cast
