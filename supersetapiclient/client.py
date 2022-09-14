@@ -127,7 +127,6 @@ class SupersetClient:
     def token_refresher(self, r, *args, **kwargs):
         """A requests response hook for token refresh."""
         if r.status_code == 401:
-
             # Check if token has expired
             try:
                 msg = r.json().get("msg")

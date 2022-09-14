@@ -1,3 +1,4 @@
+import json
 import random
 import string
 import tempfile
@@ -5,10 +6,11 @@ import tempfile
 import pytest
 
 from supersetapiclient.charts import Chart
+from supersetapiclient.client import SupersetClient
 from supersetapiclient.dashboards import Dashboard
 from supersetapiclient.databases import Database
 from supersetapiclient.datasets import Dataset
-from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError
+from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, QueryLimitReached
 from supersetapiclient.saved_queries import SavedQuery
 
 
@@ -73,7 +75,7 @@ def virtual_dataset(superset_api, database):
         schema=schema,
         table_name=table_name,
         description="My Virtual Table",
-        sql=f"SELECT i FROM {schema}.{table_name} ORDER BY i LIMIT 2",
+        sql=f"SELECT i FROM {schema}.{table_name} ORDER BY i LIMIT 3",
     )
     superset_api.datasets.add(ds)
     yield ds
@@ -137,7 +139,7 @@ def dashboard(superset_api, dataset):
             raise
 
 
-class TestClient:
+class TestEntities:
     def test_databases(self, superset_api, database):
         # Test getting an invalid item ID
         with pytest.raises(BadRequestError) as exc_info:
@@ -172,7 +174,7 @@ class TestClient:
 
         # Test running invalid SQL
         with pytest.raises(ComplexBadRequestError) as exc_info:
-            database.run(f"DROP SCHEMA xxx")
+            database.run("DROP SCHEMA xxx")
         assert exc_info.value.response.status_code == 400
         print(str(exc_info.value))
         assert str(exc_info.value) == """\
@@ -256,14 +258,25 @@ class TestClient:
 
         # Test virtual dataset
         assert virtual_dataset.run() == ([], [])
+        # Insert more values than the query limit defined in superset_config.py::SqlExecuteRestApi.query_limit
+        values = ", ".join(f"({i})" for i in range(1, 21))
         superset_api.run(
             database_id=virtual_dataset.database_id,
-            query=f"INSERT INTO {virtual_dataset.schema}.{virtual_dataset.table_name} (i) VALUES (1), (2), (3)"
+            query=f"INSERT INTO {virtual_dataset.schema}.{virtual_dataset.table_name} (i) VALUES {values}"
         )
+        # We're getting results limited by the LIMIT value in virtual_dataset.sql
         assert virtual_dataset.run() == (
             [{'is_dttm': False, 'name': 'i', 'type': 'INTEGER'}],
-            [{'i': 1}, {'i': 2}],
+            [{'i': 1}, {'i': 2}, {'i': 3}],
         )
+        virtual_dataset.sql = f"SELECT i FROM {virtual_dataset.schema}.{virtual_dataset.table_name} ORDER BY i LIMIT 15"
+        # We're hitting the query limit defined in superset_config.py::SqlExecuteRestApi.query_limit
+        with pytest.raises(QueryLimitReached) as exc_info:
+            virtual_dataset.run()
+        assert exc_info.value.args[0] == \
+               "You have exceeded the maximum number of rows that can be returned (10). Either set the `query_limit` " \
+               "attribute to a lower number than this, or add LIMIT keywords to your SQL statement to limit the " \
+               "number of rows returned."
 
     def test_saved_queries(self, superset_api, saved_query):
         # Test getting an invalid item ID
@@ -390,3 +403,33 @@ class TestClient:
             dashboard.delete()
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
+
+
+class TestClient:
+    def test_no_verify(self, superset_url):
+        superset_api = SupersetClient(superset_url, "admin", "admin", verify=False)
+        assert superset_api.databases.find()  # Call something that makes an actual HTTP call
+
+    def test_refresh_token(self, requests_mock, superset_api):
+        # Mock test a token expiry message from the API
+        requests_mock.real_http = True
+        superset_api.databases.find()  # Call something that sets up the initial token
+        url = superset_api.databases.base_url
+
+        # HTTP 401 but no token expiry message in response
+        requests_mock.get(url, status_code=401)
+        r = superset_api.get(url)
+        assert superset_api.token_refresher(r=r).status_code == 401
+
+        # HTTP 401 but wrong message in response
+        requests_mock.get(url, status_code=401, content=json.dumps({"msg": "XXX"}).encode())
+        r = superset_api.get(url)
+        assert superset_api.token_refresher(r=r).status_code == 401
+
+        # HTTP 401 and proper token expiry message in response
+        requests_mock.get(url, [
+            dict(status_code=401, content=json.dumps({"msg": "Token has expired"}).encode()),
+            dict(status_code=200, content=json.dumps([]).encode()),
+        ])
+        r = superset_api.get(url)
+        assert superset_api.token_refresher(r=r).status_code == 200

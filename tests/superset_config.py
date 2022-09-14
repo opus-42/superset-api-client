@@ -45,7 +45,7 @@ class CustomInitializer(SupersetAppInitializer):
 
             route_base = "/api/v1"
             allow_browser_login = True
-            query_limit = 1_000_000
+            query_limit = 10  # NOTE: 1_000_000 or some other high value would be a better value for production
 
             @expose("/execute_sql_json/", methods=["POST"])
             @protect()

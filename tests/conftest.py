@@ -69,7 +69,7 @@ def is_responsive(url):
 
 
 @pytest.fixture(scope="session")
-def superset_api(docker_ip, docker_services):
+def superset_url(docker_ip, docker_services):
     """Ensure that Superset API is up and responsive."""
 
     # `port_for` takes a container port and returns the corresponding host port
@@ -81,7 +81,12 @@ def superset_api(docker_ip, docker_services):
     docker_services.wait_until_responsive(
         timeout=600, pause=1.0, check=lambda: is_responsive(url)
     )
-    yield CustomClient(url, "admin", "admin")
+    yield url
+
+
+@pytest.fixture
+def superset_api(superset_url):
+    yield CustomClient(superset_url, "admin", "admin")
 
 
 @pytest.fixture(scope="session")
