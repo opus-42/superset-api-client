@@ -436,7 +436,7 @@ class TestEntities:
 class TestClient:
     def test_no_verify(self, superset_url):
         superset_api = SupersetClient(superset_url, "admin", "admin", verify=False)
-        assert superset_api.databases.find()  # Call something that makes an actual HTTP call
+        assert superset_api.databases.count() >= 0  # Call something that makes an actual HTTP call
 
     def test_refresh_token(self, requests_mock, superset_api):
         # Mock test a token expiry message from the API

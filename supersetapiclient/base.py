@@ -3,7 +3,7 @@ import logging
 import dataclasses
 try:
     from functools import cached_property
-except ImportError:
+except ImportError:  # pragma: no cover
     # Python<3.8
     from cached_property import cached_property
 import json
@@ -281,8 +281,6 @@ class ObjectFactories:
                 "q": f"[{ids_array}]"
             })
 
-        if response.status_code not in (200, 201):
-            logger.error(response.text)
         raise_for_status(response)
 
         content_type = response.headers["content-type"].strip()
@@ -290,29 +288,22 @@ class ObjectFactories:
             data = yaml.load(response.text, Loader=yaml.FullLoader)
             with open(path, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False)
-        if content_type.startswith("application/zip"):
+        elif content_type.startswith("application/zip"):
             data = response.content
             with open(path, 'wb') as f:
                 f.write(data)
-        else:
+        elif content_type.startswith("application/json"):
             data = response.json()
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
-
-        return data
+        else:
+            raise ValueError(f"Unknown content type {content_type}")
 
     def delete(self, id: int) -> bool:
         """Delete an object on remote."""
         response = self.client.delete(self.base_url + str(id))
-
-        if response.status_code not in (200, 201):
-            logger.error(response.text)
         raise_for_status(response)
-
-        if response.json().get('message') == 'OK':
-            return True
-        else:
-            return False
+        return response.json().get('message') == 'OK'
 
     def import_file(self, file_path, overwrite=False, passwords=None) -> dict:
         """Import a file on remote.

@@ -3,7 +3,7 @@ import getpass
 import logging
 try:
     from functools import cached_property
-except ImportError:
+except ImportError:  # pragma: no cover
     # Python<3.8
     from cached_property import cached_property
 
