@@ -30,6 +30,7 @@ class Dataset(Object):
 
     def to_json(self, *args, **kwargs):
         o = super().to_json(*args, **kwargs)
+        o.pop("columns", None)
         if self.id:
             o["database_id"] = self.database_id
         else:

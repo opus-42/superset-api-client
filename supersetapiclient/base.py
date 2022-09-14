@@ -107,7 +107,10 @@ class Object:
         o = o.get("result")
         for k, v in o.items():
             if k in field_names:
-                setattr(self, k, v)
+                if k in self.JSON_FIELDS:
+                    setattr(self, k, json.loads(v or "{}"))
+                else:
+                    setattr(self, k, v)
 
     def save(self) -> None:
         """Save object information."""

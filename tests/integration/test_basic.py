@@ -151,6 +151,9 @@ class TestEntities:
         assert isinstance(database.id, int)
         assert superset_api.databases.get(id=database.id).database_name == database.database_name
 
+        # Test fetch
+        database.fetch()
+
         # Test count
         assert superset_api.databases.count() >= 1
 
@@ -180,7 +183,6 @@ class TestEntities:
         with pytest.raises(ComplexBadRequestError) as exc_info:
             database.run("DROP SCHEMA xxx")
         assert exc_info.value.response.status_code == 400
-        print(str(exc_info.value))
         assert str(exc_info.value) == """\
 [
     {
@@ -227,6 +229,9 @@ class TestEntities:
         assert isinstance(dataset.id, int)
         assert superset_api.datasets.get(id=dataset.id).schema == dataset.schema
         assert superset_api.datasets.get(id=dataset.id).table_name == dataset.table_name
+
+        # Test fetch
+        dataset.fetch()
 
         # Test count
         assert superset_api.datasets.count() >= 1
@@ -296,6 +301,9 @@ class TestEntities:
         assert superset_api.saved_queries.get(id=saved_query.id).schema == saved_query.schema
         assert superset_api.saved_queries.get(id=saved_query.id).label == saved_query.label
 
+        # Test fetch
+        saved_query.fetch()
+
         # Test count
         assert superset_api.saved_queries.count() >= 1
 
@@ -343,6 +351,9 @@ class TestEntities:
         assert superset_api.charts.get(id=chart.id).slice_name == chart.slice_name
         assert superset_api.charts.get(id=chart.id).viz_type == chart.viz_type
 
+        # Test fetch
+        chart.fetch()
+
         # Test count
         assert superset_api.charts.count() >= 1
 
@@ -376,6 +387,9 @@ class TestEntities:
 
         assert isinstance(dashboard.id, int)
         assert superset_api.dashboards.get(id=dashboard.id).dashboard_title == dashboard.dashboard_title
+
+        # Test fetch
+        dashboard.fetch()
 
         # Test count
         assert superset_api.dashboards.count() >= 1
