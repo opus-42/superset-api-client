@@ -10,7 +10,8 @@ from supersetapiclient.client import SupersetClient
 from supersetapiclient.dashboards import Dashboard
 from supersetapiclient.databases import Database
 from supersetapiclient.datasets import Dataset
-from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, QueryLimitReached
+from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, QueryLimitReached, NotFound, \
+    MultipleFound
 from supersetapiclient.saved_queries import SavedQuery
 
 
@@ -150,6 +151,9 @@ class TestEntities:
         assert isinstance(database.id, int)
         assert superset_api.databases.get(id=database.id).database_name == database.database_name
 
+        # Test count
+        assert superset_api.databases.count() >= 1
+
         # Test creating a conflicting item
         db_id, database.id = database.id, None
         with pytest.raises(BadRequestError) as exc_info:
@@ -224,6 +228,9 @@ class TestEntities:
         assert superset_api.datasets.get(id=dataset.id).schema == dataset.schema
         assert superset_api.datasets.get(id=dataset.id).table_name == dataset.table_name
 
+        # Test count
+        assert superset_api.datasets.count() >= 1
+
         # Test creating a conflicting item
         ds_id, dataset.id = dataset.id, None
         with pytest.raises(BadRequestError) as exc_info:
@@ -289,6 +296,9 @@ class TestEntities:
         assert superset_api.saved_queries.get(id=saved_query.id).schema == saved_query.schema
         assert superset_api.saved_queries.get(id=saved_query.id).label == saved_query.label
 
+        # Test count
+        assert superset_api.saved_queries.count() >= 1
+
         # Conflicting saved queries can apparently not be created
 
         # Test running SQL
@@ -333,6 +343,9 @@ class TestEntities:
         assert superset_api.charts.get(id=chart.id).slice_name == chart.slice_name
         assert superset_api.charts.get(id=chart.id).viz_type == chart.viz_type
 
+        # Test count
+        assert superset_api.charts.count() >= 1
+
         # Conflicting charts can apparently not be created
 
         # Test updating the item
@@ -363,6 +376,9 @@ class TestEntities:
 
         assert isinstance(dashboard.id, int)
         assert superset_api.dashboards.get(id=dashboard.id).dashboard_title == dashboard.dashboard_title
+
+        # Test count
+        assert superset_api.dashboards.count() >= 1
 
         # Test creating a conflicting item
         d_id, dashboard.id = dashboard.id, None
@@ -404,6 +420,18 @@ class TestEntities:
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
+    def test_find_one(self, superset_api):
+        title = random_str(8)
+        with pytest.raises(NotFound):
+            superset_api.dashboards.find_one(dashboard_title=title)
+
+        superset_api.dashboards.add(Dashboard(dashboard_title=title, published=True, slug=random_str(8)))
+        assert superset_api.dashboards.find_one(dashboard_title=title).dashboard_title == title
+
+        superset_api.dashboards.add(Dashboard(dashboard_title=title, published=True, slug=random_str(8)))
+        with pytest.raises(MultipleFound):
+            superset_api.dashboards.find_one(dashboard_title=title)
+
 
 class TestClient:
     def test_no_verify(self, superset_url):
@@ -433,3 +461,13 @@ class TestClient:
         ])
         r = superset_api.get(url)
         assert superset_api.token_refresher(r=r).status_code == 200
+
+    def test_authenticate(self, monkeypatch, superset_url):
+        superset_api = SupersetClient(superset_url)  # No username or password yet
+
+        monkeypatch.setattr("getpass.getuser", lambda: "admin")
+        monkeypatch.setattr("getpass.getpass", lambda: "admin")
+        superset_api.authenticate()
+        assert superset_api.username == "admin"
+        assert superset_api._password == "admin"
+        assert superset_api.password == "*****"

@@ -12,9 +12,9 @@ from pathlib import Path
 
 import os.path
 import yaml
-from requests import Response, HTTPError
+from requests import HTTPError
 
-from supersetapiclient.exceptions import ComplexBadRequestError, NotFound, BadRequestError
+from supersetapiclient.exceptions import ComplexBadRequestError, NotFound, BadRequestError, MultipleFound
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +55,7 @@ class Object:
     @classmethod
     def field_names(cls):
         """Get field names."""
-        return set(
-            f.name
-            for f in dataclasses.fields(cls)
-        )
+        return {f.name for f in cls.fields()}
 
     @classmethod
     def from_json(cls, json: dict):
@@ -96,20 +93,6 @@ class Object:
             str(self.id)
         )
 
-    @property
-    def import_url(self) -> str:
-        return self._parent.client.join_urls(
-            self._parent.base_url,
-            str(self.id)
-        )
-
-    @property
-    def test_connection_url(self) -> str:
-        return self._parent.client.join_urls(
-            self._parent.base_url,
-            str(self.id)
-        )
-
     def export(self, path: Union[Path, str]) -> None:
         """Export object to path"""
         self._parent.export(ids=[self.id], path=path)
@@ -130,8 +113,6 @@ class Object:
         """Save object information."""
         o = self.to_json(columns=self._parent.edit_columns)
         response = self._parent.client.put(self.base_url, json=o)
-        if response.status_code in [400, 422]:
-            logger.error(response.text)
         raise_for_status(response)
 
     def delete(self) -> bool:
@@ -169,10 +150,7 @@ class ObjectFactories:
                 "q": json.dumps(self._INFO_QUERY)
             })
 
-        if response.status_code != 200:
-            logger.error(f"Unable to build object factory for {self.endpoint}")
-            raise_for_status(response)
-
+        raise_for_status(response)
         return response.json()
 
     @property
@@ -214,18 +192,6 @@ class ObjectFactories:
             self.endpoint,
             "export/"
         )
-
-    @staticmethod
-    def _handle_reponse_status(response: Response) -> None:
-        """Handle response status."""
-        if response.status_code not in (200, 201):
-            logger.error(
-                f"Unable to proceed, API return {response.status_code}"
-            )
-            logger.error(f"Full API response is {response.text}")
-
-        # Finally raising for status
-        raise_for_status(response)
 
     def get(self, id: int):
         """Get an object by id."""
@@ -281,26 +247,21 @@ class ObjectFactories:
 
     def count(self):
         """Count objects."""
-
-        # To do : add kwargs parameters for more flexibility
         response = self.client.get(self.base_url)
-
-        if response.status_code not in (200, 201):
-            logger.error(response.text)
         raise_for_status(response)
-
-        json = response.json()
-        return (json['count'])
+        return response.json()['count']
 
     def find_one(self, **kwargs):
         """Find only object or raise an Exception."""
         objects = self.find(**kwargs)
         if len(objects) == 0:
-            raise NotFound(f"No {self.base_object.__name__} has been found.")
+            raise NotFound(f"No {self.base_object.__name__} found")
+        if len(objects) > 1:
+            raise MultipleFound(f"Multiple {self.base_object.__name__} found")
         return objects[0]
 
     def add(self, obj) -> int:
-        """Create a object on remote."""
+        """Create an object on remote."""
 
         o = obj.to_json(columns=self.add_columns)
         response = self.client.post(self.base_url, json=o)
@@ -341,7 +302,7 @@ class ObjectFactories:
         return data
 
     def delete(self, id: int) -> bool:
-        """Delete a object on remote."""
+        """Delete an object on remote."""
         response = self.client.delete(self.base_url + str(id))
 
         if response.status_code not in (200, 201):

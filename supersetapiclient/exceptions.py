@@ -8,6 +8,10 @@ class NotFound(Exception):
     pass
 
 
+class MultipleFound(Exception):
+    pass
+
+
 class QueryLimitReached(Exception):
     pass
 
