@@ -1,5 +1,6 @@
 import random
 import string
+import tempfile
 
 import pytest
 
@@ -136,9 +137,9 @@ class TestClient:
         assert superset_api.databases.get(id=database.id).database_name == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/database_{database.id}.zip"
-        database.export(file)
-        superset_api.databases.import_file(file, overwrite=True)
+        with tempfile.NamedTemporaryFile(suffix=".zip") as f:
+            database.export(f.name)
+            superset_api.databases.import_file(f.name, overwrite=True)
 
         # Test deleting the item
         database.delete()
@@ -179,9 +180,9 @@ class TestClient:
         assert superset_api.datasets.get(id=dataset.id).table_name == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/dataset_{dataset.id}.zip"
-        dataset.export(file)
-        superset_api.datasets.import_file(file, overwrite=True)
+        with tempfile.NamedTemporaryFile(suffix=".zip") as f:
+            dataset.export(f.name)
+            superset_api.datasets.import_file(f.name, overwrite=True)
 
         # Test deleting the item
         dataset.delete()
@@ -225,9 +226,9 @@ class TestClient:
         assert superset_api.saved_queries.get(id=saved_query.id).label == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/saved_query_{saved_query.id}.zip"
-        saved_query.export(file)
-        superset_api.saved_queries.import_file(file, overwrite=True)
+        with tempfile.NamedTemporaryFile(suffix=".zip") as f:
+            saved_query.export(f.name)
+            superset_api.saved_queries.import_file(f.name, overwrite=True)
 
         # Test deleting the item
         saved_query.delete()
@@ -257,9 +258,9 @@ class TestClient:
         assert superset_api.charts.get(id=chart.id).slice_name == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/chart_{chart.id}.zip"
-        chart.export(file)
-        superset_api.charts.import_file(file, overwrite=True)
+        with tempfile.NamedTemporaryFile(suffix=".zip") as f:
+            chart.export(f.name)
+            superset_api.charts.import_file(f.name, overwrite=True)
 
         # Test deleting the item
         chart.delete()
@@ -294,9 +295,9 @@ class TestClient:
         assert superset_api.dashboards.get(id=dashboard.id).dashboard_title == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/dashboard_{dashboard.id}.zip"
-        dashboard.export(file)
-        superset_api.dashboards.import_file(file, overwrite=True)
+        with tempfile.NamedTemporaryFile(suffix=".zip") as f:
+            dashboard.export(f.name)
+            superset_api.dashboards.import_file(f.name, overwrite=True)
 
         # Test deleting the item
         dashboard.delete()
