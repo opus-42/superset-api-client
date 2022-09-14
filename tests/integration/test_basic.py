@@ -1,3 +1,6 @@
+import random
+import string
+
 import pytest
 
 from supersetapiclient.charts import Chart
@@ -8,304 +11,298 @@ from supersetapiclient.exceptions import BadRequestError
 from supersetapiclient.saved_queries import SavedQuery
 
 
-class TestClient:
-    def test_databases(self, superset_api):
-        # Clean up any leftover items
-        for i in superset_api.dashboards.find():
-            i.delete()
-        for i in superset_api.charts.find():
-            i.delete()
-        for i in superset_api.saved_queries.find():
-            i.delete()
-        for i in superset_api.datasets.find():
-            i.delete()
-        for i in superset_api.databases.find():
-            i.delete()
+def random_str(length, lowercase=False):
+    # Create a random string
+    chars = string.ascii_lowercase if lowercase else string.ascii_letters
+    return "".join(random.choice(chars) for _ in range(length))
 
+
+@pytest.fixture
+def database(superset_api):
+    db = Database(
+        database_name=random_str(8),
+        sqlalchemy_uri="postgresql+psycopg2://postgres:postgres@pg:5432/postgres",
+    )
+    superset_api.databases.add(db)
+    yield db
+    try:
+        db.delete()
+    except BadRequestError as e:
+        if not (e.response.status_code == 404 and e.message == "Not found"):
+            raise
+
+
+@pytest.fixture
+def dataset(superset_api, database):
+    schema, table_name = random_str(8, lowercase=True), random_str(8, lowercase=True)
+    database.run(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+    database.run(f"CREATE TABLE IF NOT EXISTS {schema}.{table_name} (i integer)")
+    ds = Dataset(
+        database_id=database.id,
+        schema=schema,
+        table_name=table_name,
+        description="My Test Table",
+    )
+    superset_api.datasets.add(ds)
+    yield ds
+    try:
+        ds.delete()
+    except BadRequestError as e:
+        if not (e.response.status_code == 404 and e.message == "Not found"):
+            raise
+
+
+@pytest.fixture
+def saved_query(superset_api, database):
+    schema, table_name = random_str(8, lowercase=True), random_str(8, lowercase=True)
+    database.run(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+    database.run(f"CREATE TABLE IF NOT EXISTS {schema}.{table_name} (i integer)")
+    sq = SavedQuery(
+        db_id=database.id,
+        label=random_str(8),
+        schema=schema,
+        sql=f"SELECT i FROM {schema}.{table_name}",
+    )
+    superset_api.saved_queries.add(sq)
+    yield sq
+    try:
+        sq.delete()
+    except BadRequestError as e:
+        if not (e.response.status_code == 404 and e.message == "Not found"):
+            raise
+
+
+@pytest.fixture
+def chart(superset_api, dataset):
+    c = Chart(
+        datasource_id=dataset.id,
+        datasource_type="table",
+        slice_name=random_str(8),
+        viz_type="table",
+    )
+    superset_api.charts.add(c)
+    yield c
+    try:
+        c.delete()
+    except BadRequestError as e:
+        if not (e.response.status_code == 404 and e.message == "Not found"):
+            raise
+
+
+@pytest.fixture
+def dashboard(superset_api, dataset):
+    d = Dashboard(
+        dashboard_title=random_str(8),
+        published=True,
+        slug=random_str(8),
+    )
+    superset_api.dashboards.add(d)
+    yield d
+    try:
+        d.delete()
+    except BadRequestError as e:
+        if not (e.response.status_code == 404 and e.message == "Not found"):
+            raise
+
+
+class TestClient:
+    def test_databases(self, superset_api, database):
         # Test getting an invalid item ID
         with pytest.raises(BadRequestError) as exc_info:
-            superset_api.databases.get(id=1)
+            superset_api.databases.get(id=0)
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-        # Test creating a new item
-        db = Database(
-            database_name="PostgreSQL",
-            sqlalchemy_uri="postgresql+psycopg2://postgres:postgres@pg:5432/postgres",
-        )
-        superset_api.databases.add(db)
-        assert isinstance(db.id, int)
-        assert superset_api.databases.get(id=db.id).database_name == "PostgreSQL"
+        assert isinstance(database.id, int)
+        assert superset_api.databases.get(id=database.id).database_name == database.database_name
 
         # Test creating a conflicting item
-        db_id, db.id = db.id, None
+        db_id, database.id = database.id, None
         with pytest.raises(BadRequestError) as exc_info:
-            superset_api.databases.add(db)
-        db.id = db_id
+            superset_api.databases.add(database)
+        database.id = db_id
         assert exc_info.value.response.status_code == 422
         assert exc_info.value.message == {"database_name": "A database with the same name already exists."}
 
         # Test connection to DB
-        assert db.test_connection()
+        assert database.test_connection()
 
         # Test running SQL
-        assert db.run("CREATE SCHEMA IF NOT EXISTS test_schema") == ([], [])
+        assert database.run("CREATE SCHEMA IF NOT EXISTS test_schema") == ([], [])
 
         # Test updating the item
-        db.database_name = "XXX"
-        db.save()
-        assert superset_api.databases.get(id=db.id).database_name == "XXX"
+        database.database_name = "XXX"
+        database.save()
+        assert superset_api.databases.get(id=database.id).database_name == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/database_{db.id}.zip"
-        db.export(file)
+        file = f"/tmp/database_{database.id}.zip"
+        database.export(file)
         superset_api.databases.import_file(file, overwrite=True)
 
         # Test deleting the item
-        db.delete()
+        database.delete()
 
         # Test deleting a non-existent item
         with pytest.raises(BadRequestError) as exc_info:
-            db.delete()
+            database.delete()
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-    def test_datasets(self, superset_api):
-        # Clean up any leftover items
-        for i in superset_api.saved_queries.find():
-            i.delete()
-        for i in superset_api.datasets.find():
-            i.delete()
-        for i in superset_api.databases.find():
-            i.delete()
-
+    def test_datasets(self, superset_api, database, dataset):
         # Test getting an invalid item ID
         with pytest.raises(BadRequestError) as exc_info:
-            superset_api.datasets.get(id=1)
+            superset_api.datasets.get(id=0)
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-        # Test creating a new item
-        db = Database(
-            database_name="PostgreSQL",
-            sqlalchemy_uri="postgresql+psycopg2://postgres:postgres@pg:5432/postgres",
-        )
-        superset_api.databases.add(db)
-        db.run("CREATE SCHEMA IF NOT EXISTS test_schema")
-        db.run("CREATE TABLE IF NOT EXISTS test_schema.test_table (i integer)")
-        ds = Dataset(
-            database_id=db.id,
-            schema="test_schema",
-            table_name="test_table",
-            description="My Test Table",
-        )
-        superset_api.datasets.add(ds)
-        assert isinstance(ds.id, int)
-        assert superset_api.datasets.get(id=ds.id).schema == "test_schema"
-        assert superset_api.datasets.get(id=ds.id).table_name == "test_table"
+        assert isinstance(dataset.id, int)
+        assert superset_api.datasets.get(id=dataset.id).schema == dataset.schema
+        assert superset_api.datasets.get(id=dataset.id).table_name == dataset.table_name
 
         # Test creating a conflicting item
-        ds_id, ds.id = ds.id, None
+        ds_id, dataset.id = dataset.id, None
         with pytest.raises(BadRequestError) as exc_info:
-            superset_api.datasets.add(ds)
-        ds.id = ds_id
+            superset_api.datasets.add(dataset)
+        dataset.id = ds_id
         assert exc_info.value.response.status_code == 422
-        assert exc_info.value.message == {'table_name': ['Dataset test_table already exists']}
+        assert exc_info.value.message == {"table_name": [f"Dataset {dataset.table_name} already exists"]}
 
         # Test running SQL
         with pytest.raises(ValueError) as exc_info:
-            ds.run()
+            dataset.run()
         assert exc_info.value.args[0] == "Cannot run a dataset with no SQL"
 
         # Test updating the item
-        ds.table_name = "XXX"
-        ds.save()
-        assert superset_api.datasets.get(id=ds.id).table_name == "XXX"
+        dataset.table_name = "XXX"
+        dataset.save()
+        assert superset_api.datasets.get(id=dataset.id).table_name == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/dataset_{ds.id}.zip"
-        ds.export(file)
+        file = f"/tmp/dataset_{dataset.id}.zip"
+        dataset.export(file)
         superset_api.datasets.import_file(file, overwrite=True)
 
         # Test deleting the item
-        ds.delete()
+        dataset.delete()
 
         # Test deleting a non-existent item
         with pytest.raises(BadRequestError) as exc_info:
-            ds.delete()
+            dataset.delete()
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
         # TODO: test virtual dataset
 
-    def test_saved_queries(self, superset_api):
-        # Clean up any leftover items
-        for i in superset_api.saved_queries.find():
-            i.delete()
-        for i in superset_api.databases.find():
-            i.delete()
-
+    def test_saved_queries(self, superset_api, saved_query):
         # Test getting an invalid item ID
         with pytest.raises(BadRequestError) as exc_info:
-            superset_api.saved_queries.get(id=1)
+            superset_api.saved_queries.get(id=0)
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-        # Test creating a new item
-        db = Database(
-            database_name="PostgreSQL",
-            sqlalchemy_uri="postgresql+psycopg2://postgres:postgres@pg:5432/postgres",
-        )
-        superset_api.databases.add(db)
-        db.run("CREATE SCHEMA IF NOT EXISTS test_schema")
-        db.run("CREATE TABLE IF NOT EXISTS test_schema.test_table (i integer)")
-        sq = SavedQuery(
-            db_id=db.id,
-            label="My Test Query",
-            schema="test_schema",
-            sql="SELECT i FROM test_schema.test_table",
-        )
-        superset_api.saved_queries.add(sq)
-        assert isinstance(sq.id, int)
-        assert superset_api.saved_queries.get(id=sq.id).schema == "test_schema"
-        assert superset_api.saved_queries.get(id=sq.id).label == "My Test Query"
+        assert isinstance(saved_query.id, int)
+        assert superset_api.saved_queries.get(id=saved_query.id).schema == saved_query.schema
+        assert superset_api.saved_queries.get(id=saved_query.id).label == saved_query.label
 
         # Conflicting saved queries can apparently not be created
 
         # Test running SQL
-        db.run("DELETE FROM test_schema.test_table")
-        assert sq.run() == ([], [])
-        db.run("INSERT INTO test_schema.test_table (i) VALUES (1), (2), (3)")
-        assert sq.run() == (
+        assert saved_query.run() == ([], [])
+        table_path = saved_query.sql.split("FROM")[-1].strip()  # Hacky, but it's the only way we can get the table name
+        superset_api.run(
+            database_id=saved_query.db_id,
+            query=f"INSERT INTO {table_path} (i) VALUES (1), (2), (3)"
+        )
+        assert saved_query.run() == (
             [{'is_dttm': False, 'name': 'i', 'type': 'INTEGER'}],
             [{'i': 1}, {'i': 2}, {'i': 3}],
         )
 
         # Test updating the item
-        sq.label = "XXX"
-        sq.save()
-        assert superset_api.saved_queries.get(id=sq.id).label == "XXX"
+        saved_query.label = "XXX"
+        saved_query.save()
+        assert superset_api.saved_queries.get(id=saved_query.id).label == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/saved_query_{sq.id}.zip"
-        sq.export(file)
+        file = f"/tmp/saved_query_{saved_query.id}.zip"
+        saved_query.export(file)
         superset_api.saved_queries.import_file(file, overwrite=True)
 
         # Test deleting the item
-        sq.delete()
+        saved_query.delete()
 
         # Test deleting a non-existent item
         with pytest.raises(BadRequestError) as exc_info:
-            sq.delete()
+            saved_query.delete()
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-    def test_charts(self, superset_api):
-        # Clean up any leftover items
-        for i in superset_api.charts.find():
-            i.delete()
-        for i in superset_api.datasets.find():
-            i.delete()
-        for i in superset_api.databases.find():
-            i.delete()
-
+    def test_charts(self, superset_api, chart):
         # Test getting an invalid item ID
         with pytest.raises(BadRequestError) as exc_info:
-            superset_api.charts.get(id=1)
+            superset_api.charts.get(id=0)
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-        # Test creating a new item
-        db = Database(
-            database_name="PostgreSQL",
-            sqlalchemy_uri="postgresql+psycopg2://postgres:postgres@pg:5432/postgres",
-        )
-        superset_api.databases.add(db)
-        db.run("CREATE SCHEMA IF NOT EXISTS test_schema")
-        db.run("CREATE TABLE IF NOT EXISTS test_schema.test_table (i integer)")
-        ds = Dataset(
-            database_id=db.id,
-            schema="test_schema",
-            table_name="test_table",
-            description="My Test Table",
-        )
-        superset_api.datasets.add(ds)
-        c = Chart(
-            datasource_id=ds.id,
-            datasource_type="table",
-            slice_name="My Test Chart",
-            viz_type="table",
-        )
-        superset_api.charts.add(c)
-        assert isinstance(c.id, int)
-        assert superset_api.charts.get(id=c.id).slice_name == "My Test Chart"
-        assert superset_api.charts.get(id=c.id).viz_type == "table"
+        assert isinstance(chart.id, int)
+        assert superset_api.charts.get(id=chart.id).slice_name == chart.slice_name
+        assert superset_api.charts.get(id=chart.id).viz_type == chart.viz_type
 
         # Conflicting charts can apparently not be created
 
         # Test updating the item
-        c.slice_name = "XXX"
-        c.save()
-        assert superset_api.charts.get(id=c.id).slice_name == "XXX"
+        chart.slice_name = "XXX"
+        chart.save()
+        assert superset_api.charts.get(id=chart.id).slice_name == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/chart_{c.id}.zip"
-        c.export(file)
+        file = f"/tmp/chart_{chart.id}.zip"
+        chart.export(file)
         superset_api.charts.import_file(file, overwrite=True)
 
         # Test deleting the item
-        c.delete()
+        chart.delete()
 
         # Test deleting a non-existent item
         with pytest.raises(BadRequestError) as exc_info:
-            c.delete()
+            chart.delete()
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-    def test_dashboards(self, superset_api):
-        # Clean up any leftover items
-        for i in superset_api.dashboards.find():
-            i.delete()
-
+    def test_dashboards(self, superset_api, dashboard):
         # Test getting an invalid item ID
         with pytest.raises(BadRequestError) as exc_info:
-            superset_api.dashboards.get(id=1)
+            superset_api.dashboards.get(id=0)
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-        # Test creating a new item
-        d = Dashboard(
-            dashboard_title="My Dashboard",
-            published=True,
-            slug="my_dashboard",
-        )
-        superset_api.dashboards.add(d)
-        assert isinstance(d.id, int)
-        assert superset_api.dashboards.get(id=d.id).dashboard_title == "My Dashboard"
+        assert isinstance(dashboard.id, int)
+        assert superset_api.dashboards.get(id=dashboard.id).dashboard_title == dashboard.dashboard_title
 
         # Test creating a conflicting item
-        d_id, d.id = d.id, None
+        d_id, dashboard.id = dashboard.id, None
         with pytest.raises(BadRequestError) as exc_info:
-            superset_api.dashboards.add(d)
-        d.id = d_id
+            superset_api.dashboards.add(dashboard)
+        dashboard.id = d_id
         assert exc_info.value.response.status_code == 422
         assert exc_info.value.message == {'slug': ['Must be unique']}
 
         # Test updating the item
-        d.dashboard_title = "XXX"
-        d.save()
-        assert superset_api.dashboards.get(id=d.id).dashboard_title == "XXX"
+        dashboard.dashboard_title = "XXX"
+        dashboard.save()
+        assert superset_api.dashboards.get(id=dashboard.id).dashboard_title == "XXX"
 
         # Test exporting and importing the item
-        file = f"/tmp/dashboard_{d.id}.zip"
-        d.export(file)
+        file = f"/tmp/dashboard_{dashboard.id}.zip"
+        dashboard.export(file)
         superset_api.dashboards.import_file(file, overwrite=True)
 
         # Test deleting the item
-        d.delete()
+        dashboard.delete()
 
         # Test deleting a non-existent item
         with pytest.raises(BadRequestError) as exc_info:
-            d.delete()
+            dashboard.delete()
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
