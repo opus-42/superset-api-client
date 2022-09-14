@@ -18,7 +18,7 @@ class BadRequestError(HTTPError):
         super().__init__(*args, **kwargs)
 
     def __str__(self):
-        return self.message
+        return json.dumps(self.message, indent=4)
 
 
 class ComplexBadRequestError(HTTPError):

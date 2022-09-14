@@ -8,7 +8,7 @@ from supersetapiclient.charts import Chart
 from supersetapiclient.dashboards import Dashboard
 from supersetapiclient.databases import Database
 from supersetapiclient.datasets import Dataset
-from supersetapiclient.exceptions import BadRequestError
+from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError
 from supersetapiclient.saved_queries import SavedQuery
 
 
@@ -34,10 +34,18 @@ def database(superset_api):
 
 
 @pytest.fixture
-def dataset(superset_api, database):
+def database_with_table(database):
     schema, table_name = random_str(8, lowercase=True), random_str(8, lowercase=True)
     database.run(f"CREATE SCHEMA IF NOT EXISTS {schema}")
     database.run(f"CREATE TABLE IF NOT EXISTS {schema}.{table_name} (i integer)")
+    yield database, schema, table_name
+    database.run(f"DROP TABLE IF EXISTS {schema}.{table_name}")
+    database.run(f"DROP SCHEMA IF EXISTS {schema}")
+
+
+@pytest.fixture
+def dataset(superset_api, database_with_table):
+    database, schema, table_name = database_with_table
     ds = Dataset(
         database_id=database.id,
         schema=schema,
@@ -54,10 +62,33 @@ def dataset(superset_api, database):
 
 
 @pytest.fixture
-def saved_query(superset_api, database):
+def virtual_dataset(superset_api, database):
+    # We're using 'dataset' and 'virtual_dataset' in the same test case so need to create a new table here because
+    # two databases can't cover the same table.
     schema, table_name = random_str(8, lowercase=True), random_str(8, lowercase=True)
     database.run(f"CREATE SCHEMA IF NOT EXISTS {schema}")
     database.run(f"CREATE TABLE IF NOT EXISTS {schema}.{table_name} (i integer)")
+    ds = Dataset(
+        database_id=database.id,
+        schema=schema,
+        table_name=table_name,
+        description="My Virtual Table",
+        sql=f"SELECT i FROM {schema}.{table_name} ORDER BY i LIMIT 2",
+    )
+    superset_api.datasets.add(ds)
+    yield ds
+    database.run(f"DROP TABLE IF EXISTS {schema}.{table_name}")
+    database.run(f"DROP SCHEMA IF EXISTS {schema}")
+    try:
+        ds.delete()
+    except BadRequestError as e:
+        if not (e.response.status_code == 404 and e.message == "Not found"):
+            raise
+
+
+@pytest.fixture
+def saved_query(superset_api, database_with_table):
+    database, schema, table_name = database_with_table
     sq = SavedQuery(
         db_id=database.id,
         label=random_str(8),
@@ -124,12 +155,42 @@ class TestClient:
         database.id = db_id
         assert exc_info.value.response.status_code == 422
         assert exc_info.value.message == {"database_name": "A database with the same name already exists."}
+        assert str(exc_info.value) == """\
+{
+    "database_name": "A database with the same name already exists."
+}"""
 
         # Test connection to DB
         assert database.test_connection()
 
         # Test running SQL
-        assert database.run("CREATE SCHEMA IF NOT EXISTS test_schema") == ([], [])
+        schema = random_str(8)
+        try:
+            assert database.run(f"CREATE SCHEMA IF NOT EXISTS {schema}") == ([], [])
+        finally:
+            database.run(f"DROP SCHEMA IF EXISTS {schema}")
+
+        # Test running invalid SQL
+        with pytest.raises(ComplexBadRequestError) as exc_info:
+            database.run(f"DROP SCHEMA xxx")
+        assert exc_info.value.response.status_code == 400
+        print(str(exc_info.value))
+        assert str(exc_info.value) == """\
+[
+    {
+        "message": "postgresql error: schema \\"xxx\\" does not exist\\n",
+        "error_type": "GENERIC_DB_ENGINE_ERROR",
+        "extra": {
+            "engine_name": "PostgreSQL",
+            "issue_codes": [
+                {
+                    "code": 1002,
+                    "message": "Issue 1002 - The database returned an unexpected error."
+                }
+            ]
+        }
+    }
+]"""
 
         # Test updating the item
         database.database_name = "XXX"
@@ -150,7 +211,7 @@ class TestClient:
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-    def test_datasets(self, superset_api, database, dataset):
+    def test_datasets(self, superset_api, dataset, virtual_dataset):
         # Test getting an invalid item ID
         with pytest.raises(BadRequestError) as exc_info:
             superset_api.datasets.get(id=0)
@@ -193,7 +254,16 @@ class TestClient:
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-        # TODO: test virtual dataset
+        # Test virtual dataset
+        assert virtual_dataset.run() == ([], [])
+        superset_api.run(
+            database_id=virtual_dataset.database_id,
+            query=f"INSERT INTO {virtual_dataset.schema}.{virtual_dataset.table_name} (i) VALUES (1), (2), (3)"
+        )
+        assert virtual_dataset.run() == (
+            [{'is_dttm': False, 'name': 'i', 'type': 'INTEGER'}],
+            [{'i': 1}, {'i': 2}],
+        )
 
     def test_saved_queries(self, superset_api, saved_query):
         # Test getting an invalid item ID
@@ -271,7 +341,7 @@ class TestClient:
         assert exc_info.value.response.status_code == 404
         assert exc_info.value.message == "Not found"
 
-    def test_dashboards(self, superset_api, dashboard):
+    def test_dashboards(self, superset_api, dashboard, chart):
         # Test getting an invalid item ID
         with pytest.raises(BadRequestError) as exc_info:
             superset_api.dashboards.get(id=0)
@@ -293,6 +363,19 @@ class TestClient:
         dashboard.dashboard_title = "XXX"
         dashboard.save()
         assert superset_api.dashboards.get(id=dashboard.id).dashboard_title == "XXX"
+
+        # Test changing colors
+        dashboard.update_colors({
+            "label": "#fcba03"
+        })
+        dashboard.save()
+        assert superset_api.dashboards.get(id=dashboard.id).colors == {"label": "#fcba03"}
+
+        # Test connected charts
+        chart.dashboards.append(dashboard.id)
+        chart.save()
+        assert [d["id"] for d in superset_api.charts.get(id=chart.id).dashboards] == [dashboard.id]
+        assert [c.id for c in superset_api.dashboards.get(id=dashboard.id).get_charts()] == [chart.id]
 
         # Test exporting and importing the item
         with tempfile.NamedTemporaryFile(suffix=".zip") as f:

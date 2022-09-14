@@ -1,5 +1,5 @@
 """Charts."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from supersetapiclient.base import (
@@ -20,6 +20,12 @@ class Chart(Object):
     datasource_id: Optional[int] = None
     datasource_type: str = default_string()
     viz_type: str = ""
+    dashboards: list[int] = field(default_factory=list)
+
+    def to_json(self, columns):
+        o = super().to_json(columns)
+        o["dashboards"] = self.dashboards
+        return o
 
 
 class Charts(ObjectFactories):

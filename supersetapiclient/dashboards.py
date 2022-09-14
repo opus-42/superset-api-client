@@ -1,5 +1,5 @@
 """Dashboards."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from supersetapiclient.base import (
@@ -25,7 +25,7 @@ class Dashboard(Object):
     changed_by_url: str = default_string()
     css: str = default_string()
     changed_on: str = default_string()
-    charts: list = default_string()
+    charts: List[str] = field(default_factory=list)
 
     @property
     def colors(self) -> dict:
@@ -44,14 +44,11 @@ class Dashboard(Object):
         self.colors = colors
 
     def get_charts(self) -> List[int]:
-        """Get dashboard Slice IDs."""
+        """Get chart objects"""
         charts = []
-        for _, v in self.position_json.items():
-            if isinstance(v, dict):
-                if v.get("type") == "CHART":
-                    meta = v.get("meta", {})
-                    if meta.get("chartId") is not None:
-                        charts.append(meta.get("chartId"))
+        for slice_name in self.charts:
+            c = self._parent.client.charts.find_one(slice_name=slice_name)
+            charts.append(c)
         return charts
 
 
