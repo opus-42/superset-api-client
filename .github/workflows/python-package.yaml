@@ -25,7 +25,7 @@ jobs:
           flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
       - name: Test with pytest and coverage
         env:
-         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pytest -cov=supersetapiclient tests
           coveralls --service=github
