@@ -287,20 +287,24 @@ class ObjectFactories:
         raise_for_status(response)
 
         content_type = response.headers["content-type"].strip()
-        if content_type.startswith("application/text"):
+        if content_type.startswith("application/text"):  # pragma: no cover
+            # Superset 1.x
             data = yaml.load(response.text, Loader=yaml.FullLoader)
             with open(path, "w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False)
-        elif content_type.startswith("application/zip"):
-            data = response.content
-            with open(path, 'wb') as f:
-                f.write(data)
-        elif content_type.startswith("application/json"):
+            return
+        if content_type.startswith("application/json"):  # pragma: no cover
+            # Superset 1.x
             data = response.json()
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
-        else:
-            raise ValueError(f"Unknown content type {content_type}")
+            return
+        if content_type.startswith("application/zip"):
+            data = response.content
+            with open(path, 'wb') as f:
+                f.write(data)
+            return
+        raise ValueError(f"Unknown content type {content_type}")
 
     def delete(self, id: int) -> bool:
         """Delete an object on remote."""

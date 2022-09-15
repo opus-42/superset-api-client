@@ -4,9 +4,11 @@ import string
 import tempfile
 
 import pytest
+import requests
+import requests.exceptions
 
 from supersetapiclient.charts import Chart
-from supersetapiclient.client import SupersetClient
+from supersetapiclient.client import SupersetClient, raise_for_status
 from supersetapiclient.dashboards import Dashboard
 from supersetapiclient.databases import Database
 from supersetapiclient.datasets import Dataset
@@ -281,6 +283,11 @@ class TestEntities:
             [{'is_dttm': False, 'name': 'i', 'type': 'INTEGER'}],
             [{'i': 1}, {'i': 2}, {'i': 3}],
         )
+        # Limit the query result size. TODO: This doesn't actually work in Superset 2.x for some reason
+        assert virtual_dataset.run(query_limit=2) == (
+            [{'is_dttm': False, 'name': 'i', 'type': 'INTEGER'}],
+            [{'i': 1}, {'i': 2}, {'i': 3}],
+        )
         virtual_dataset.sql = f"SELECT i FROM {virtual_dataset.schema}.{virtual_dataset.table_name} ORDER BY i LIMIT 15"
         # We're hitting the query limit defined in superset_config.py::SqlExecuteRestApi.query_limit
         with pytest.raises(QueryLimitReached) as exc_info:
@@ -485,3 +492,38 @@ class TestClient:
         assert superset_api.username == "admin"
         assert superset_api._password == "admin"
         assert superset_api.password == "*****"
+
+    def test_standard_sql_endpoint(self):
+        # Test the _sql_endpoint value returned by the plain SupersetClient class. The CustomClient class used in this
+        # test suite overrides it.
+        superset_api = SupersetClient("https://example.com")
+        assert superset_api._sql_endpoint == "https://example.com/superset/sql_json/"
+
+    def test_export_failure(self, requests_mock, superset_api):
+        requests_mock.real_http = True
+        requests_mock.get(superset_api.databases.export_url, status_code=200, headers={"content-type": "application/x"})
+        with pytest.raises(ValueError) as exc_info:
+            superset_api.databases.export([1], "/dev/null")
+        assert exc_info.value.args[0] == "Unknown content type application/x"
+
+
+class TestExceptions:
+    def test_raise_for_status(self, requests_mock):
+        url = "https://example.com"
+
+        requests_mock.get(url, status_code=500, content=b"XXX")
+        r = requests.get(url)
+        with pytest.raises(requests.exceptions.HTTPError):
+            raise_for_status(r)
+
+        requests_mock.get(url, status_code=500, content=json.dumps({"message": "XXX"}).encode())
+        r = requests.get(url)
+        with pytest.raises(BadRequestError) as exc_info:
+            raise_for_status(r)
+        assert exc_info.value.message == "XXX"
+
+        requests_mock.get(url, status_code=500, content=json.dumps({"errors": ["foo"]}).encode())
+        r = requests.get(url)
+        with pytest.raises(ComplexBadRequestError) as exc_info:
+            raise_for_status(r)
+        assert exc_info.value.errors == ["foo"]
