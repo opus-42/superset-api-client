@@ -2,17 +2,12 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from supersetapiclient.base import (
-    Object, ObjectFactories, json_field, default_string
-)
+from supersetapiclient.base import Object, ObjectFactories, default_string, json_field
 
 
 @dataclass
 class Dashboard(Object):
-    JSON_FIELDS = [
-        "json_metadata",
-        "position_json"
-    ]
+    JSON_FIELDS = ["json_metadata", "position_json"]
 
     dashboard_title: str
     published: bool
@@ -53,5 +48,5 @@ class Dashboard(Object):
 
 
 class Dashboards(ObjectFactories):
-    endpoint = "/dashboard/"
+    endpoint = "dashboard/"
     base_object = Dashboard

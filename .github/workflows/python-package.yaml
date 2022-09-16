@@ -21,8 +21,10 @@ jobs:
           pip install .[dev]
       - name: Lint with flake8
         run: |
-          # fully comply to pep8
-          flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
+          # Check style
+          black --check --diff examples scripts supersetapiclient tests
+          isort --check --diff examples scripts supersetapiclient tests
+          flake8 examples scripts supersetapiclient tests
       - name: Test with pytest and coverage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

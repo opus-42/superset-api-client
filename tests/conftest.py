@@ -24,7 +24,7 @@ class CustomClient(SupersetClient):
 
 
 @pytest.fixture
-def permanent_requests(requests_mock): # noqa
+def permanent_requests(requests_mock):  # noqa
 
     # List domain in folder
     for domain in API_MOCKS.iterdir():
@@ -40,24 +40,14 @@ def permanent_requests(requests_mock): # noqa
 
                     # Register mock on action within domain and endpoint
                     url = f"{SUPERSET_API_URI}/{domain_name}/{endpoint_name}"
-                    getattr(requests_mock, action)(
-                        url=url,
-                        json=json.load(endpoint.open())
-                    )
-                    getattr(requests_mock, action)(
-                        url=f"{url}/",
-                        json=json.load(endpoint.open())
-                    )
+                    getattr(requests_mock, action)(url=url, json=json.load(endpoint.open()))
+                    getattr(requests_mock, action)(url=f"{url}/", json=json.load(endpoint.open()))
 
 
 @pytest.fixture
 def client(permanent_requests):
 
-    client = SupersetClient(
-        SUPERSET_BASE_URI,
-        "test",
-        "test"
-    )
+    client = SupersetClient(SUPERSET_BASE_URI, "test", "test")
     yield client
 
 
@@ -78,9 +68,7 @@ def superset_url(docker_ip, docker_services):
     url = f"{schema}://{docker_ip}:{port}"
     if schema == "http":
         os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-    docker_services.wait_until_responsive(
-        timeout=600, pause=1.0, check=lambda: is_responsive(url)
-    )
+    docker_services.wait_until_responsive(timeout=600, pause=1.0, check=lambda: is_responsive(url))
     yield url
 
 
@@ -98,7 +86,13 @@ def docker_compose_file(pytestconfig):
 # See https://github.com/avast/pytest-docker/issues/46#issuecomment-887408396
 def pytest_addoption(parser):
     """Add the --keepalive option for pytest."""
-    parser.addoption("--keepalive", "-K", action="store_true", default=False, help="Keep Docker containers alive")
+    parser.addoption(
+        "--keepalive",
+        "-K",
+        action="store_true",
+        default=False,
+        help="Keep Docker containers alive",
+    )
 
 
 @pytest.fixture(scope="session")

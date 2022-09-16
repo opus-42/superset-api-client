@@ -12,7 +12,4 @@ dashboard.export("one_dashboard")
 
 
 # Export multiple dashboards
-client.dashboards.export(
-    ids=[10, 11],
-    path="./multiple_dashboards"
-)
+client.dashboards.export(ids=[10, 11], path="./multiple_dashboards")

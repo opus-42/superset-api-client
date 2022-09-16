@@ -1,20 +1,22 @@
 """Base classes."""
-import logging
 import dataclasses
+import logging
+
 try:
     from functools import cached_property
 except ImportError:  # pragma: no cover
     # Python<3.8
     from cached_property import cached_property
-import json
-from typing import List, Union
-from pathlib import Path
 
+import json
 import os.path
+from pathlib import Path
+from typing import List, Union
+
 import yaml
 from requests import HTTPError
 
-from supersetapiclient.exceptions import ComplexBadRequestError, NotFound, BadRequestError, MultipleFound
+from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +90,7 @@ class Object:
 
     @property
     def base_url(self) -> str:
-        return self._parent.client.join_urls(
-            self._parent.base_url,
-            str(self.id)
-        )
+        return self._parent.client.join_urls(self._parent.base_url, self.id)
 
     def export(self, path: Union[Path, str]) -> None:
         """Export object to path"""
@@ -102,9 +101,8 @@ class Object:
         field_names = self.field_names()
 
         client = self._parent.client
-        reponse = client.get(self.base_url)
-        o = reponse.json()
-        o = o.get("result")
+        response = client.get(self.base_url)
+        o = response.json().get("result")
         for k, v in o.items():
             if k in field_names:
                 if k in self.JSON_FIELDS:
@@ -126,12 +124,7 @@ class ObjectFactories:
     endpoint = ""
     base_object: Object = None
 
-    _INFO_QUERY = {
-        "keys": [
-            "add_columns",
-            "edit_columns"
-        ]
-    }
+    _INFO_QUERY = {"keys": ["add_columns", "edit_columns"]}
 
     def __init__(self, client):
         """Create a new Dashboards endpoint.
@@ -144,64 +137,40 @@ class ObjectFactories:
     @cached_property
     def _infos(self):
         # Get infos
-        response = self.client.get(
-            self.client.join_urls(
-                self.base_url,
-                "_info",
-            ),
-            params={
-                "q": json.dumps(self._INFO_QUERY)
-            })
+        response = self.client.get(self.info_url, params={"q": json.dumps(self._INFO_QUERY)})
 
         raise_for_status(response)
         return response.json()
 
     @property
     def add_columns(self):
-        return [
-            e.get("name")
-            for e in self._infos.get("add_columns", [])
-        ]
+        return [e.get("name") for e in self._infos.get("add_columns", [])]
 
     @property
     def edit_columns(self):
-        return [
-            e.get("name")
-            for e in self._infos.get("edit_columns", [])
-        ]
+        return [e.get("name") for e in self._infos.get("edit_columns", [])]
 
     @property
     def base_url(self):
         """Base url for these objects."""
-        return self.client.join_urls(
-            self.client.base_url,
-            self.endpoint,
-        )
+        return self.client.join_urls(self.client.base_url, self.endpoint)
+
+    @property
+    def info_url(self):
+        return self.client.join_urls(self.base_url, "_info")
 
     @property
     def import_url(self):
-        """Base url for these objects."""
-        return self.client.join_urls(
-            self.client.base_url,
-            self.endpoint,
-            "import/"
-        )
+        return self.client.join_urls(self.base_url, "import/")
 
     @property
     def export_url(self):
-        """Base url for these objects."""
-        return self.client.join_urls(
-            self.client.base_url,
-            self.endpoint,
-            "export/"
-        )
+        return self.client.join_urls(self.base_url, "export/")
 
     def get(self, id: int):
         """Get an object by id."""
-        url = self.base_url + str(id)
-        response = self.client.get(
-            url
-        )
+        url = self.client.join_urls(self.base_url, id)
+        response = self.client.get(url)
         raise_for_status(response)
         response = response.json()
 
@@ -214,29 +183,16 @@ class ObjectFactories:
 
     def find(self, page_size: int = 100, page: int = 0, **kwargs):
         """Find and get objects from api."""
-        url = self.base_url
-
         # Get response
         query = {
             "page_size": page_size,
             "page": page,
-            "filters": [
-                {
-                    "col": k,
-                    "opr": "eq",
-                    "value": v
-                } for k, v in kwargs.items()
-            ]
+            "filters": [{"col": k, "opr": "eq", "value": v} for k, v in kwargs.items()],
         }
 
-        params = {
-            "q": json.dumps(query)
-        }
+        params = {"q": json.dumps(query)}
 
-        response = self.client.get(
-            url,
-            params=params
-        )
+        response = self.client.get(self.base_url, params=params)
         raise_for_status(response)
         response = response.json()
 
@@ -252,7 +208,7 @@ class ObjectFactories:
         """Count objects."""
         response = self.client.get(self.base_url)
         raise_for_status(response)
-        return response.json()['count']
+        return response.json()["count"]
 
     def find_one(self, **kwargs):
         """Find only object or raise an Exception."""
@@ -275,14 +231,8 @@ class ObjectFactories:
 
     def export(self, ids: List[int], path: Union[Path, str]) -> None:
         """Export object into an importable file"""
-        client = self.client
-        url = self.export_url
-        ids_array = ','.join([str(i) for i in ids])
-        response = client.get(
-            url,
-            params={
-                "q": f"[{ids_array}]"
-            })
+        ids_array = ",".join([str(i) for i in ids])
+        response = self.client.get(self.export_url, params={"q": f"[{ids_array}]"})
 
         raise_for_status(response)
 
@@ -296,21 +246,22 @@ class ObjectFactories:
         if content_type.startswith("application/json"):  # pragma: no cover
             # Superset 1.x
             data = response.json()
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             return
         if content_type.startswith("application/zip"):
             data = response.content
-            with open(path, 'wb') as f:
+            with open(path, "wb") as f:
                 f.write(data)
             return
         raise ValueError(f"Unknown content type {content_type}")
 
     def delete(self, id: int) -> bool:
-        """Delete an object on remote."""
-        response = self.client.delete(self.base_url + str(id))
+        """Delete a object on remote."""
+        url = self.client.join_urls(self.base_url, id)
+        response = self.client.delete(url)
         raise_for_status(response)
-        return response.json().get('message') == 'OK'
+        return response.json().get("message") == "OK"
 
     def import_file(self, file_path, overwrite=False, passwords=None) -> dict:
         """Import a file on remote.
@@ -322,12 +273,8 @@ class ObjectFactories:
         databases/MyDatabase.yaml, the password should be provided in the
         following format: {"MyDatabase": "my_password"}
         """
-        url = self.import_url
-
         data = {"overwrite": json.dumps(overwrite)}
-        passwords = {
-            f"databases/{db}.yaml": pwd for db, pwd in (passwords or {}).items()
-        }
+        passwords = {f"databases/{db}.yaml": pwd for db, pwd in (passwords or {}).items()}
         file_name = os.path.split(file_path)[-1]
         file_ext = os.path.splitext(file_name)[-1].lstrip(".").lower()
         with open(file_path, "rb") as f:
@@ -336,10 +283,12 @@ class ObjectFactories:
                 "passwords": (None, json.dumps(passwords), None),
             }
             response = self.client.post(
-                url, files=files, data=data,
-                headers={"Accept": "application/json"}
+                self.import_url,
+                files=files,
+                data=data,
+                headers={"Accept": "application/json"},
             )
         raise_for_status(response)
 
         # If import is successful, the following is returned: {'message': 'OK'}
-        return response.json().get('message') == 'OK'
+        return response.json().get("message") == "OK"

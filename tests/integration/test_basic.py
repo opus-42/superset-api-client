@@ -12,8 +12,7 @@ from supersetapiclient.client import SupersetClient, raise_for_status
 from supersetapiclient.dashboards import Dashboard
 from supersetapiclient.databases import Database
 from supersetapiclient.datasets import Dataset
-from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, QueryLimitReached, NotFound, \
-    MultipleFound
+from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound, QueryLimitReached
 from supersetapiclient.saved_queries import SavedQuery
 
 
@@ -166,10 +165,13 @@ class TestEntities:
         database.id = db_id
         assert exc_info.value.response.status_code == 422
         assert exc_info.value.message == {"database_name": "A database with the same name already exists."}
-        assert str(exc_info.value) == """\
+        assert (
+            str(exc_info.value)
+            == """\
 {
     "database_name": "A database with the same name already exists."
 }"""
+        )
 
         # Test connection to DB
         assert database.test_connection()
@@ -185,7 +187,9 @@ class TestEntities:
         with pytest.raises(ComplexBadRequestError) as exc_info:
             database.run("DROP SCHEMA xxx")
         assert exc_info.value.response.status_code == 400
-        assert str(exc_info.value) == """\
+        assert (
+            str(exc_info.value)
+            == """\
 [
     {
         "message": "postgresql error: schema \\"xxx\\" does not exist\\n",
@@ -201,6 +205,7 @@ class TestEntities:
         }
     }
 ]"""
+        )
 
         # Test updating the item
         database.database_name = "XXX"
@@ -276,26 +281,28 @@ class TestEntities:
         values = ", ".join(f"({i})" for i in range(1, 21))
         superset_api.run(
             database_id=virtual_dataset.database_id,
-            query=f"INSERT INTO {virtual_dataset.schema}.{virtual_dataset.table_name} (i) VALUES {values}"
+            query=f"INSERT INTO {virtual_dataset.schema}.{virtual_dataset.table_name} (i) VALUES {values}",
         )
         # We're getting results limited by the LIMIT value in virtual_dataset.sql
         assert virtual_dataset.run() == (
-            [{'is_dttm': False, 'name': 'i', 'type': 'INTEGER'}],
-            [{'i': 1}, {'i': 2}, {'i': 3}],
+            [{"is_dttm": False, "name": "i", "type": "INTEGER"}],
+            [{"i": 1}, {"i": 2}, {"i": 3}],
         )
         # Limit the query result size. TODO: This doesn't actually work in Superset 2.x for some reason
         assert virtual_dataset.run(query_limit=2) == (
-            [{'is_dttm': False, 'name': 'i', 'type': 'INTEGER'}],
-            [{'i': 1}, {'i': 2}, {'i': 3}],
+            [{"is_dttm": False, "name": "i", "type": "INTEGER"}],
+            [{"i": 1}, {"i": 2}, {"i": 3}],
         )
         virtual_dataset.sql = f"SELECT i FROM {virtual_dataset.schema}.{virtual_dataset.table_name} ORDER BY i LIMIT 15"
         # We're hitting the query limit defined in superset_config.py::SqlExecuteRestApi.query_limit
         with pytest.raises(QueryLimitReached) as exc_info:
             virtual_dataset.run()
-        assert exc_info.value.args[0] == \
-               "You have exceeded the maximum number of rows that can be returned (10). Either set the `query_limit` " \
-               "attribute to a lower number than this, or add LIMIT keywords to your SQL statement to limit the " \
-               "number of rows returned."
+        assert (
+            exc_info.value.args[0]
+            == "You have exceeded the maximum number of rows that can be returned (10). Either set the `query_limit` "
+            "attribute to a lower number than this, or add LIMIT keywords to your SQL statement to limit the "
+            "number of rows returned."
+        )
 
     def test_saved_queries(self, superset_api, saved_query):
         # Test getting an invalid item ID
@@ -321,11 +328,11 @@ class TestEntities:
         table_path = saved_query.sql.split("FROM")[-1].strip()  # Hacky, but it's the only way we can get the table name
         superset_api.run(
             database_id=saved_query.db_id,
-            query=f"INSERT INTO {table_path} (i) VALUES (1), (2), (3)"
+            query=f"INSERT INTO {table_path} (i) VALUES (1), (2), (3)",
         )
         assert saved_query.run() == (
-            [{'is_dttm': False, 'name': 'i', 'type': 'INTEGER'}],
-            [{'i': 1}, {'i': 2}, {'i': 3}],
+            [{"is_dttm": False, "name": "i", "type": "INTEGER"}],
+            [{"i": 1}, {"i": 2}, {"i": 3}],
         )
 
         # Test updating the item
@@ -407,7 +414,7 @@ class TestEntities:
             superset_api.dashboards.add(dashboard)
         dashboard.id = d_id
         assert exc_info.value.response.status_code == 422
-        assert exc_info.value.message == {'slug': ['Must be unique']}
+        assert exc_info.value.message == {"slug": ["Must be unique"]}
 
         # Test updating the item
         dashboard.dashboard_title = "XXX"
@@ -415,9 +422,7 @@ class TestEntities:
         assert superset_api.dashboards.get(id=dashboard.id).dashboard_title == "XXX"
 
         # Test changing colors
-        dashboard.update_colors({
-            "label": "#fcba03"
-        })
+        dashboard.update_colors({"label": "#fcba03"})
         dashboard.save()
         assert superset_api.dashboards.get(id=dashboard.id).colors == {"label": "#fcba03"}
 
@@ -476,10 +481,16 @@ class TestClient:
         assert superset_api.token_refresher(r=r).status_code == 401
 
         # HTTP 401 and proper token expiry message in response
-        requests_mock.get(url, [
-            dict(status_code=401, content=json.dumps({"msg": "Token has expired"}).encode()),
-            dict(status_code=200, content=json.dumps([]).encode()),
-        ])
+        requests_mock.get(
+            url,
+            [
+                dict(
+                    status_code=401,
+                    content=json.dumps({"msg": "Token has expired"}).encode(),
+                ),
+                dict(status_code=200, content=json.dumps([]).encode()),
+            ],
+        )
         r = superset_api.get(url)
         assert superset_api.token_refresher(r=r).status_code == 200
 
@@ -501,7 +512,11 @@ class TestClient:
 
     def test_export_failure(self, requests_mock, superset_api):
         requests_mock.real_http = True
-        requests_mock.get(superset_api.databases.export_url, status_code=200, headers={"content-type": "application/x"})
+        requests_mock.get(
+            superset_api.databases.export_url,
+            status_code=200,
+            headers={"content-type": "application/x"},
+        )
         with pytest.raises(ValueError) as exc_info:
             superset_api.databases.export([1], "/dev/null")
         assert exc_info.value.args[0] == "Unknown content type application/x"

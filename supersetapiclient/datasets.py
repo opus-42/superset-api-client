@@ -2,9 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from supersetapiclient.base import (
-    Object, ObjectFactories
-)
+from supersetapiclient.base import Object, ObjectFactories
 
 
 @dataclass
@@ -40,13 +38,9 @@ class Dataset(Object):
     def run(self, query_limit=None):
         if not self.sql:
             raise ValueError("Cannot run a dataset with no SQL")
-        return self._parent.client.run(
-            database_id=self.database_id,
-            query=self.sql,
-            query_limit=query_limit
-        )
+        return self._parent.client.run(database_id=self.database_id, query=self.sql, query_limit=query_limit)
 
 
 class Datasets(ObjectFactories):
-    endpoint = "/dataset/"
+    endpoint = "dataset/"
     base_object = Dataset

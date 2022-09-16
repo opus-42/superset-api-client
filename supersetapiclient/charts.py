@@ -1,17 +1,13 @@
 """Charts."""
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import List, Optional
 
-from supersetapiclient.base import (
-    Object, ObjectFactories, json_field, default_string
-)
+from supersetapiclient.base import Object, ObjectFactories, default_string, json_field
 
 
 @dataclass
 class Chart(Object):
-    JSON_FIELDS = [
-        "params"
-    ]
+    JSON_FIELDS = ["params"]
 
     id: Optional[int] = None
     description: str = default_string()
@@ -29,7 +25,7 @@ class Chart(Object):
 
 
 class Charts(ObjectFactories):
-    endpoint = "/chart/"
+    endpoint = "chart/"
     base_object = Chart
 
     @property
@@ -41,10 +37,10 @@ class Charts(ObjectFactories):
         #   'datasource_id',
         #   'datasource_type'
         return [
-            'datasource_id',
-            'datasource_type',
-            'slice_name',
-            'params',
-            'viz_type',
-            'description'
+            "datasource_id",
+            "datasource_type",
+            "slice_name",
+            "params",
+            "viz_type",
+            "description",
         ]

@@ -72,8 +72,17 @@ This functionality is also available in the same manner for datasets
 ## Development
 
 You will need Docker and docker-compose in order to run development environment.
-To start development environnement run:
+To start development environment run:
 
 ```bash
     docker-compose up -d
+```
+
+
+# Contributing
+Before committing to this repository, you must have [pre-commit](https://pre-commit.com) installed, and install
+the following pre-commit hooks:
+
+```sh
+pre-commit install --install-hooks -t pre-commit -t pre-push
 ```
