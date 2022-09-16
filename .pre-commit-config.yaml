@@ -21,11 +21,9 @@ repos:
         entry: isort --check --diff
         types: [ python ]
         language: system
-        always_run: true
       - id: flake8
         name: flake8
         stages: [ commit ]
         entry: flake8
         types: [ python ]
         language: system
-        always_run: true
