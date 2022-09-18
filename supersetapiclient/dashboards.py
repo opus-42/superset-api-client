@@ -1,34 +1,26 @@
 """Dashboards."""
-from typing import List
+from dataclasses import dataclass, field
+from typing import List, Optional
 
-from dataclasses import dataclass
-
-from supersetapiclient.base import (
-    Object, ObjectFactories, json_field, default_string
-)
+from supersetapiclient.base import Object, ObjectFactories, default_string, json_field
 
 
 @dataclass
 class Dashboard(Object):
-    JSON_FIELDS = [
-        "json_metadata",
-        "position_json"
-    ]
-    EXPORTABLE = True
+    JSON_FIELDS = ["json_metadata", "position_json"]
 
-    id: int
     dashboard_title: str
     published: bool
+    id: Optional[int] = None
     json_metadata: dict = json_field()
     position_json: dict = json_field()
-    changed_by: str = default_string()
     changed_by: str = default_string()
     slug: str = default_string()
     changed_by_name: str = default_string()
     changed_by_url: str = default_string()
     css: str = default_string()
     changed_on: str = default_string()
-    charts: list = default_string()
+    charts: List[str] = field(default_factory=list)
 
     @property
     def colors(self) -> dict:
@@ -47,17 +39,14 @@ class Dashboard(Object):
         self.colors = colors
 
     def get_charts(self) -> List[int]:
-        """Get dashboard Slice IDs."""
+        """Get chart objects"""
         charts = []
-        for _, v in self.position_json.items():
-            if isinstance(v, dict):
-                if v.get("type") == "CHART":
-                    meta = v.get("meta", {})
-                    if meta.get("chartId") is not None:
-                        charts.append(meta.get("chartId"))
+        for slice_name in self.charts:
+            c = self._parent.client.charts.find_one(slice_name=slice_name)
+            charts.append(c)
         return charts
 
 
 class Dashboards(ObjectFactories):
-    endpoint = "/dashboard/"
+    endpoint = "dashboard/"
     base_object = Dashboard

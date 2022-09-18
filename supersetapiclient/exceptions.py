@@ -8,6 +8,10 @@ class NotFound(Exception):
     pass
 
 
+class MultipleFound(Exception):
+    pass
+
+
 class QueryLimitReached(Exception):
     pass
 
@@ -18,7 +22,7 @@ class BadRequestError(HTTPError):
         super().__init__(*args, **kwargs)
 
     def __str__(self):
-        return self.message
+        return json.dumps(self.message, indent=4)
 
 
 class ComplexBadRequestError(HTTPError):

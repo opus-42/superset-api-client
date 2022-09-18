@@ -10,7 +10,14 @@ services:
       - "127.0.0.1:8080:8080"
     environment:
       - LOAD_EXAMPLES="${LOAD_EXAMPLES}"
-      # - SUPERSET_CONFIG_PATH=/app/superset_home/test_config.py
+      - SUPERSET_CONFIG_PATH=/app/superset_home/test_config.py
     volumes:
       - ./scripts/entrypoint.sh:/app/superset_home/entrypoint.sh
-      # - ./tests/superset_test_config.py:/app/superset_home/test_config.py
+      - ./tests/superset_config.py:/app/superset_home/test_config.py
+  postgres:
+    image: postgres:14.1-alpine
+    hostname: pg
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
