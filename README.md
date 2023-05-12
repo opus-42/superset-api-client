@@ -20,6 +20,15 @@ client = SupersetClient(
 )
 ```
 
+When developping in local (only), you may need to accept insecure transport (i.e. http).
+This is NOT recommanded outside of local development environement, that is requesting `localhost`.
+
+```python3
+import os
+
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+```
+
 ### Quickstart
 Get all dashboards or find one by name:
 ```python3
