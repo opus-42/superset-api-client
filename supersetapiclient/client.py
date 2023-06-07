@@ -12,6 +12,7 @@ import requests.adapters
 import requests.exceptions
 import requests_oauthlib
 
+from supersetapiclient.assets import Assets
 from supersetapiclient.base import raise_for_status
 from supersetapiclient.charts import Charts
 from supersetapiclient.dashboards import Dashboards
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 class SupersetClient:
     """A Superset Client."""
 
+    assets_cls = Assets
     dashboards_cls = Dashboards
     charts_cls = Charts
     datasets_cls = Datasets
@@ -50,6 +52,7 @@ class SupersetClient:
             self.http_adapter_cls = NoVerifyHTTPAdapter
 
         # Related Objects
+        self.assets = self.assets_cls(self)
         self.dashboards = self.dashboards_cls(self)
         self.charts = self.charts_cls(self)
         self.datasets = self.datasets_cls(self)
