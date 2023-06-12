@@ -54,7 +54,7 @@ class Assets:
         passwords = {f"databases/{db}.yaml": pwd for db, pwd in (passwords or {}).items()}
 
         files = {
-            "bundle": (file_path.name, open(file_path.name, 'rb'), f"application/{file_ext}"),
+            "bundle": (file_path.name, open(file_path.name, "rb"), f"application/{file_ext}"),
             "passwords": json.dumps(passwords),
         }
         response = self.client.post(self.import_url, files=files)

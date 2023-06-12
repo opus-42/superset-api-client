@@ -25,17 +25,14 @@ class CustomClient(SupersetClient):
 
 @pytest.fixture
 def permanent_requests(requests_mock):  # noqa
-
     # List domain in folder
     for domain in API_MOCKS.iterdir():
         domain_name = domain.name
 
         if domain.is_dir():
-
             # List file in dir
             for endpoint in domain.iterdir():
                 if endpoint.is_file():
-
                     endpoint_name, action = endpoint.name.split(".")
 
                     # Register mock on action within domain and endpoint
@@ -46,7 +43,6 @@ def permanent_requests(requests_mock):  # noqa
 
 @pytest.fixture
 def client(permanent_requests):
-
     client = SupersetClient(SUPERSET_BASE_URI, "test", "test")
     yield client
 
