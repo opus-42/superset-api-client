@@ -4,11 +4,12 @@ from typing import List, Optional
 
 from supersetapiclient.base import Object, ObjectFactories, default_string, json_field
 from supersetapiclient.dashboards.metadata import Metadata
+from supersetapiclient.dashboards.metadataposition import Metadataposition
 
 
 @dataclass
 class Dashboard(Object):
-    JSON_FIELDS = ["position_json"]
+    JSON_FIELDS = []
 
     dashboard_title: str
     published: bool
@@ -23,6 +24,7 @@ class Dashboard(Object):
     charts: List[str] = field(default_factory=list)
 
     metadata: Metadata = Metadata()
+    position: Metadataposition = Metadataposition()
     owners: List[int] = field(default_factory=list)
     roles: List[int] = field(default_factory=list)
 
@@ -53,9 +55,9 @@ class Dashboard(Object):
     def to_json(self, columns=None):
         if columns is None:
             columns = self.field_names()
-        self.json_metadata = self.metadata.to_json()
-        columns.append('json_metadata')
         data = super().to_json(columns)
+        data['position_json'] = self.position.to_json()
+        data['json_metadata'] = self.metadata.to_json()
         return data
 
 class Dashboards(ObjectFactories):

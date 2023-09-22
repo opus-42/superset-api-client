@@ -25,8 +25,8 @@ def json_field():
     return dataclasses.field(default=None, repr=False)
 
 
-def default_string():
-    return dataclasses.field(default="", repr=False)
+def default_string(default: str = ""):
+    return dataclasses.field(default=default, repr=False)
 
 
 def raise_for_status(response):

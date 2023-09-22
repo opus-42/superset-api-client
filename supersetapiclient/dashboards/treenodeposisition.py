@@ -1,5 +1,6 @@
-from anytree import Node, NodeMixin, RenderTree, search, AsciiStyle
-from typing import Any, Optional
+from typing import List, Dict
+
+from anytree import Node, RenderTree, search
 import shortuuid
 from typing_extensions import Self
 from enum import Enum
@@ -107,7 +108,7 @@ class NodePosition(Node):
         pass
 
 
-class TreeNodePosition:8
+class TreeNodePosition:
     def __init__(self, name: str, type_ : NodeValueType):
         self._root = NodePosition(name, type_)
 
@@ -129,3 +130,16 @@ class TreeNodePosition:8
         # print(RenderTree(self.root, style=AsciiStyle()).by_attr())
         for pre, fill, node in RenderTree(self.root ):
             print(f"{pre}{node.value}")
+
+    def __to_json(self, node: NodePosition, values: Dict):
+        for child_key in node.value.get("children", []):
+            node_child = self.find_by_id(child_key)
+            values[child_key] = node_child.value
+            self.__to_json(node_child, values)
+
+    def to_json(self):
+        values = {}
+        values[self.root.id] = self.root.value
+        self.__to_json(self.root, values)
+        return values
+

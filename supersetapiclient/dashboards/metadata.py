@@ -10,8 +10,6 @@ class Metadata(Object):
     JSON_FIELDS = ['default_filters']
 
     color_scheme: str = default_string()
-    # positions: dict = json_field()
-    position: Metadataposition = Metadataposition()
     refresh_frequency: int = field(default=0)
     shared_label_colors: dict = field(default_factory=dict)
     color_scheme_domain: List[str] = field(default_factory=list)
@@ -27,5 +25,4 @@ class Metadata(Object):
         if columns is None:
             columns = self.field_names()
         data = super().to_json(columns)
-        data['positions'] = self.position.to_json()
         return json.dumps(data)
