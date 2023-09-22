@@ -56,8 +56,11 @@ class Object:
 
     @classmethod
     def field_names(cls):
-        """Get field names."""
-        return {f.name for f in cls.fields()}
+        fields = []
+        for f in cls.fields():
+            if not isinstance(f.default, Object):
+                fields.append(f.name)
+        return fields
 
     @classmethod
     def from_json(cls, json: dict):
@@ -223,6 +226,7 @@ class ObjectFactories:
         """Create an object on remote."""
 
         o = obj.to_json(columns=self.add_columns)
+        print('99999999:', o)
         response = self.client.post(self.base_url, json=o)
         raise_for_status(response)
         obj.id = response.json().get("id")

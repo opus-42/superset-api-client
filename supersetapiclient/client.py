@@ -15,7 +15,7 @@ import requests_oauthlib
 from supersetapiclient.assets import Assets
 from supersetapiclient.base import raise_for_status
 from supersetapiclient.charts import Charts
-from supersetapiclient.dashboards import Dashboards
+from supersetapiclient.dashboards.dashboards import Dashboards
 from supersetapiclient.databases import Databases
 from supersetapiclient.datasets import Datasets
 from supersetapiclient.exceptions import QueryLimitReached

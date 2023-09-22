@@ -3,16 +3,16 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from supersetapiclient.base import Object, ObjectFactories, default_string, json_field
+from supersetapiclient.dashboards.metadata import Metadata
 
 
 @dataclass
 class Dashboard(Object):
-    JSON_FIELDS = ["json_metadata", "position_json"]
+    JSON_FIELDS = ["position_json"]
 
     dashboard_title: str
     published: bool
     id: Optional[int] = None
-    json_metadata: dict = json_field()
     position_json: dict = json_field()
     changed_by: str = default_string()
     slug: str = default_string()
@@ -21,6 +21,10 @@ class Dashboard(Object):
     css: str = default_string()
     changed_on: str = default_string()
     charts: List[str] = field(default_factory=list)
+
+    metadata: Metadata = Metadata()
+    owners: List[int] = field(default_factory=list)
+    roles: List[int] = field(default_factory=list)
 
     @property
     def colors(self) -> dict:
@@ -46,6 +50,13 @@ class Dashboard(Object):
             charts.append(c)
         return charts
 
+    def to_json(self, columns=None):
+        if columns is None:
+            columns = self.field_names()
+        self.json_metadata = self.metadata.to_json()
+        columns.append('json_metadata')
+        data = super().to_json(columns)
+        return data
 
 class Dashboards(ObjectFactories):
     endpoint = "dashboard/"
