@@ -1,116 +1,73 @@
 from typing import List, Dict
 
 from anytree import Node, RenderTree, search
-import shortuuid
+
 from typing_extensions import Self
-from enum import Enum
 
-class NodeValueType(Enum):
-    ROOT = 'ROOT'
-    GRID = 'GRID'
-    TABS = 'TABS'
-    TAB = 'TAB'
-    ROW = 'ROW'
-    CHART = 'CHART'
-    COLUMN = 'COLUMN'
-    MARKDOWN = 'MARKDOWN'
-
-    def __str__(self):
-        return str(self.value)
-
-    def __eq__(self, other):
-        if str(self.__class__) == str(other.__class__):
-            return self.value == other.value
-        return False
+from supersetapiclient.dashboards.itemposition import ItemPositionType, GenericItemPosition, _RootItemPosition, \
+    _GridItemPosition, _TABSItemPosition, TABItemPosition, MarkdownItemPosition, _ROWItemPosition
+from supersetapiclient.utils import generate_uuid
 
 
 class NodePosition(Node):
-    def __init__(self, id: str, _type: NodeValueType, parent: Self=None, children: Self=None):
-        value = {
-            "id": id,
-            "type": str(_type),
-            "children": [],
-            "parents": []
-        }
-
-        self._value = value
-        super().__init__(id, parent, children)
+    def __init__(self, item: GenericItemPosition, parent: Self=None, children: Self=None):
+        self._item = item
+        super().__init__(item.id, parent, children)
 
         if parent:
-            parent.value['children'].append(id)
-            self.value['parents'].append(parent.value['id'])
+            parent.item.children.append(item.id)
+            self.item.parents.append(parent.item.id)
 
     @property
-    def value(self):
-        return self._value
+    def item(self):
+        return self._item
 
     @property
     def id(self):
-        return self.name
+        return self._item.id
 
     @property
     def type_(self):
-        return NodeValueType(self.value['type'])
+        return ItemPositionType(self.item.type_)
 
-    @classmethod
-    def generate_uuid(cls, _type):
-        return f"{_type}-{shortuuid.ShortUUID().random(length=10)}"
-    #print(generate_uuid('TAB'))
 
-    def insert(self, title: str, _type: NodeValueType, uuid: str = None) -> Self:
+    def insert(self, item: GenericItemPosition) -> Self:
         func = {
-            'GRID': None,
-            'TAB': self.__insert_tab,
-            'CHART': self.__insert_charts
+            'TAB': self.insert_tab,
+            'MARKDOWN': self.insert_markdown,
         }
 
-        if not func.get(str(_type)):
-            raise KeyError(f'{_type} not found!')
+        if not func.get(str(item.type_)):
+            raise KeyError(f'{item.type_} not found!')
 
-        if uuid is None:
-            uuid = self.generate_uuid(_type)
+        return func[str(item.type_)](item)
 
-        return func[str(_type)](uuid, title, _type)
+    def insert_tab(self, item: TABItemPosition):
+        parent = self.__ger_or_insert_parent(_TABSItemPosition(), self)
+        return NodePosition(item, parent)
 
-    def __insert_tab(self, uuid: str, title: str, _type: NodeValueType):
-        parent = self
+    def insert_markdown(self, item: MarkdownItemPosition):
+        parent = self.__ger_or_insert_parent(_ROWItemPosition(), self)
+        return NodePosition(item, parent)
 
+    def __ger_or_insert_parent(self, item: GenericItemPosition, parent: Self):
         # Verifica se o nó pai é do tipo TABS, se não,
         # Busca se exist um filho do tipo TABS.
         # Caso não encontre, crie um filho do tipo TABS
-        if parent.type_ != NodeValueType.TABS:
+        if parent.type_ != item.type_:
             child_tabs_exists = False
             for child in parent.children:
-                if child.type_ == NodeValueType.TABS:
+                if child.type_ == item.type_:
                     parent = child
                     child_tabs_exists = True
             if not child_tabs_exists:
-                parent = self.__insert_tabs(parent)
-
-        node = NodePosition(uuid, _type, parent)
-        value = { 
-                "meta": {
-                  "defaultText": "Tab title",
-                  "placeholder": "Tab title",
-                  "text": title
-                }
-              }
-        node.value.update(value)
-        return node
-    
-    def __insert_tabs(self, parent: Self):
-        uuid = self.generate_uuid('TABS-')
-        node = NodePosition(uuid, NodeValueType.TABS, parent)
-        node.value.update({ "meta": {} })
-        return node
-
-    def __insert_charts(self):
-        pass
-
+                return NodePosition(item, parent)
+        return parent
 
 class TreeNodePosition:
-    def __init__(self, name: str, type_ : NodeValueType):
-        self._root = NodePosition(name, type_)
+    def __init__(self):
+        self._root = NodePosition(_RootItemPosition())
+        NodePosition(_GridItemPosition(), self._root)
 
     @property
     def root(self) -> NodePosition:
@@ -128,18 +85,18 @@ class TreeNodePosition:
 
     def print(self):
         # print(RenderTree(self.root, style=AsciiStyle()).by_attr())
-        for pre, fill, node in RenderTree(self.root ):
-            print(f"{pre}{node.value}")
+        for pre, fill, node in RenderTree(self.root):
+            print(f"{pre}{node.item}")
 
-    def __to_json(self, node: NodePosition, values: Dict):
-        for child_key in node.value.get("children", []):
-            node_child = self.find_by_id(child_key)
-            values[child_key] = node_child.value
-            self.__to_json(node_child, values)
+    def __to_dict(self, node: NodePosition, values: Dict):
+        for child_id in node.item.children:
+            node_child = self.find_by_id(child_id)
+            values[child_id] = node_child.item.to_dict()
+            self.__to_dict(node_child, values)
 
-    def to_json(self):
+    def to_dict(self):
         values = {}
-        values[self.root.id] = self.root.value
-        self.__to_json(self.root, values)
+        values[self.root.id] = self.root.item.to_dict()
+        self.__to_dict(self.root, values)
         return values
 

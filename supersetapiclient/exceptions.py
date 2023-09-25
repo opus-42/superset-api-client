@@ -32,3 +32,6 @@ class ComplexBadRequestError(HTTPError):
 
     def __str__(self):
         return json.dumps(self.errors, indent=4)
+
+class ChildClassImplementedError(Exception):
+    pass

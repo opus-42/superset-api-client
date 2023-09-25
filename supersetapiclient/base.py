@@ -56,6 +56,7 @@ class Object:
 
     @classmethod
     def field_names(cls):
+        """Get field names."""
         fields = []
         for f in cls.fields():
             if not isinstance(f.default, Object):
@@ -75,7 +76,7 @@ class Object:
         field_names = cls.field_names()
         return cls(**{k: v for k, v in json.items() if k in field_names})
 
-    def to_json(self, columns):
+    def to_dict(self, columns):
         o = {}
         for c in columns:
             if not hasattr(self, c):
@@ -86,6 +87,10 @@ class Object:
                 value = json.dumps(value)
             o[c] = value
         return o
+
+    def to_json(self, columns):
+        return self.to_dict(columns)
+
 
     def __post_init__(self):
         for f in self.JSON_FIELDS:
@@ -170,12 +175,18 @@ class ObjectFactories:
     def export_url(self):
         return self.client.join_urls(self.base_url, "export/")
 
-    def get(self, id: int):
+    def get(self, id_or_slug: str):
         """Get an object by id."""
-        url = self.client.join_urls(self.base_url, id)
+        url = self.client.join_urls(self.base_url, id_or_slug)
+        print('>>>def get', url, '\n\tself.client.session.headers:', self.client.session.headers)
         response = self.client.get(url)
+        # self.client.get('https://cpa2022.ifrn.edu.br/api/v1/dashboard/11').json()['result']
+        print('>>>def get, response:', response.json())
         raise_for_status(response)
         response = response.json()
+
+
+
 
         object_json = response.get("result")
         object_json["id"] = id
@@ -194,8 +205,8 @@ class ObjectFactories:
         }
 
         params = {"q": json.dumps(query)}
-
         response = self.client.get(self.base_url, params=params)
+        print('>>> def find: ', response.json())
         raise_for_status(response)
         response = response.json()
 
@@ -226,7 +237,7 @@ class ObjectFactories:
         """Create an object on remote."""
 
         o = obj.to_json(columns=self.add_columns)
-        print('99999999:', o)
+        print('99999999:', type(o), '\n\t', o)
         response = self.client.post(self.base_url, json=o)
         raise_for_status(response)
         obj.id = response.json().get("id")

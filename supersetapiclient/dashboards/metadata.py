@@ -21,8 +21,9 @@ class Metadata(Object):
     chart_configuration: dict = field(default_factory=dict)
     default_filters: dict = json_field()
 
-    def to_json(self, columns=None):
-        if columns is None:
-            columns = self.field_names()
-        data = super().to_json(columns)
-        return json.dumps(data)
+    def to_dict(self):
+        columns = self.field_names()
+        return super().to_dict(columns)
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
