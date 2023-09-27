@@ -1,6 +1,7 @@
 """A Superset REST Api Client."""
 import getpass
 import logging
+import urllib.parse
 
 try:
     from functools import cached_property
@@ -45,6 +46,8 @@ class SupersetClient:
     ):
         self.host = host
         self.base_url = self.join_urls(host, "api/v1")
+        self._http_protocol = urllib.parse.urlparse(self.base_url).scheme
+
         self.username = username
         self._password = password
         self.provider = provider
@@ -65,6 +68,26 @@ class SupersetClient:
 
     @cached_property
     def session(self):
+        if self._http_protocol == 'https':
+            return self.__session_oath2()
+        elif self._http_protocol == 'http':
+            return self.__session_http()
+
+    def __session_http(self):
+        session = requests.Session()
+        session.headers['Authorization'] = f"Bearer {self._token['access_token']}"
+
+        # Update headers
+        session.headers.update(
+            {
+                "X-CSRFToken": f"{self.csrf_token(session)}",
+                "Referer": f"{self.base_url}",
+            }
+        )
+        return session
+
+
+    def __session_oath2(self):
         session = requests_oauthlib.OAuth2Session(token=self._token)
         session.hooks["response"] = [self.token_refresher]
         if self.http_adapter_cls:
@@ -78,6 +101,7 @@ class SupersetClient:
             }
         )
         return session
+
 
     # Method shortcuts
     @property

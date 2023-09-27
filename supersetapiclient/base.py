@@ -1,5 +1,7 @@
 """Base classes."""
 import dataclasses
+import re
+from dataclasses import make_dataclass
 import logging
 
 try:
@@ -28,6 +30,8 @@ def json_field():
 def default_string(default: str = ""):
     return dataclasses.field(default=default, repr=False)
 
+def default_bool(default:bool = False):
+    return dataclasses.field(default=default, repr=False)
 
 def raise_for_status(response):
     try:
@@ -64,7 +68,7 @@ class Object:
         return fields
 
     @classmethod
-    def from_json(cls, json: dict):
+    def from_json(cls, data: dict):
         """Create Object from json
 
         Args:
@@ -74,7 +78,14 @@ class Object:
             Object: return the related object
         """
         field_names = cls.field_names()
-        return cls(**{k: v for k, v in json.items() if k in field_names})
+        return cls(**{k: v for k, v in data.items() if k in field_names})
+
+    # @classmethod
+    # def from_json(cls, data: dict):
+    #     # cls_name = re.findall(r"\.(\w+)", str(cls))[-1]
+    #     # Dataclasse = make_dataclass(cls_name, data.keys())
+    #     obj = cls(**data)
+    #     return obj
 
     def to_dict(self, columns):
         o = {}
@@ -178,18 +189,11 @@ class ObjectFactories:
     def get(self, id_or_slug: str):
         """Get an object by id."""
         url = self.client.join_urls(self.base_url, id_or_slug)
-        print('>>>def get', url, '\n\tself.client.session.headers:', self.client.session.headers)
         response = self.client.get(url)
-        # self.client.get('https://cpa2022.ifrn.edu.br/api/v1/dashboard/11').json()['result']
-        print('>>>def get, response:', response.json())
         raise_for_status(response)
         response = response.json()
-
-
-
-
         object_json = response.get("result")
-        object_json["id"] = id
+        object_json["id"] = id_or_slug
         object = self.base_object.from_json(object_json)
         object._parent = self
 
@@ -203,10 +207,8 @@ class ObjectFactories:
             "page": page,
             "filters": [{"col": k, "opr": "eq", "value": v} for k, v in kwargs.items()],
         }
-
         params = {"q": json.dumps(query)}
         response = self.client.get(self.base_url, params=params)
-        print('>>> def find: ', response.json())
         raise_for_status(response)
         response = response.json()
 
@@ -237,7 +239,6 @@ class ObjectFactories:
         """Create an object on remote."""
 
         o = obj.to_json(columns=self.add_columns)
-        print('99999999:', type(o), '\n\t', o)
         response = self.client.post(self.base_url, json=o)
         raise_for_status(response)
         obj.id = response.json().get("id")
