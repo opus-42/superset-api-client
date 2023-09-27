@@ -19,9 +19,9 @@ class Dataset(Object):
     sql: str = ""
 
     @classmethod
-    def from_json(cls, json: dict):
-        res = super().from_json(json)
-        database = json.get("database")
+    def from_json(cls, data: dict):
+        res = super().from_json(data)
+        database = data.get("database")
         if database:
             res.database_id = database.get("id")
         return res

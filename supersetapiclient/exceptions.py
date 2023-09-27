@@ -33,5 +33,14 @@ class ComplexBadRequestError(HTTPError):
     def __str__(self):
         return json.dumps(self.errors, indent=4)
 
-class ChildClassImplementedError(Exception):
+
+class ItemPositionValidationError(Exception):
+    pass
+
+
+class AcceptChildError(Exception):
+    def __init__(self, message='Item position does not allow including children'):
+        super().__init__(message)
+
+class NodePositionValidationError(Exception):
     pass

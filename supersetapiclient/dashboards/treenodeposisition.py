@@ -1,87 +1,33 @@
-from typing import List, Dict
+from typing import Dict
 
-from anytree import Node, RenderTree, search
-
+from anytree import RenderTree, search
 from typing_extensions import Self
 
-from supersetapiclient.dashboards.itemposition import ItemPositionType, GenericItemPosition, _RootItemPosition, \
-    _GridItemPosition, _TABSItemPosition, TABItemPosition, MarkdownItemPosition, _ROWItemPosition
-from supersetapiclient.utils import generate_uuid
+from supersetapiclient.dashboards.itemposition import ItemPosition, _RootItemPosition, \
+    _GridItemPosition, ItemPositionType, ItemPositionParse
+from supersetapiclient.dashboards.nodeposisition import NodePosition, TabNodePosition, \
+    MarkdownNodePosition, NodePositionParse, GridNodePosition, RootNodePosition
 
-
-class NodePosition(Node):
-    def __init__(self, item: GenericItemPosition, parent: Self=None, children: Self=None):
-        self._item = item
-        super().__init__(item.id, parent, children)
-
-        if parent:
-            parent.item.children.append(item.id)
-            self.item.parents.append(parent.item.id)
-
-    @property
-    def item(self):
-        return self._item
-
-    @property
-    def id(self):
-        return self._item.id
-
-    @property
-    def type_(self):
-        return ItemPositionType(self.item.type_)
-
-
-    def insert(self, item: GenericItemPosition) -> Self:
-        func = {
-            'TAB': self.insert_tab,
-            'MARKDOWN': self.insert_markdown,
-        }
-
-        if not func.get(str(item.type_)):
-            raise KeyError(f'{item.type_} not found!')
-
-        return func[str(item.type_)](item)
-
-    def insert_tab(self, item: TABItemPosition):
-        parent = self.__ger_or_insert_parent(_TABSItemPosition(), self)
-        return NodePosition(item, parent)
-
-    def insert_markdown(self, item: MarkdownItemPosition):
-        parent = self.__ger_or_insert_parent(_ROWItemPosition(), self)
-        return NodePosition(item, parent)
-
-    def __ger_or_insert_parent(self, item: GenericItemPosition, parent: Self):
-        # Verifica se o nó pai é do tipo TABS, se não,
-        # Busca se exist um filho do tipo TABS.
-        # Caso não encontre, crie um filho do tipo TABS
-        if parent.type_ != item.type_:
-            child_tabs_exists = False
-            for child in parent.children:
-                if child.type_ == item.type_:
-                    parent = child
-                    child_tabs_exists = True
-            if not child_tabs_exists:
-                return NodePosition(item, parent)
-        return parent
 
 class TreeNodePosition:
     def __init__(self):
-        self._root = NodePosition(_RootItemPosition())
-        NodePosition(_GridItemPosition(), self._root)
+        self._root = RootNodePosition(_RootItemPosition())
+        GridNodePosition(_GridItemPosition(), self._root)
 
     @property
     def root(self) -> NodePosition:
         return self._root
 
-    # def insert(self, value: dict, parent_id: Optional[str] = None) -> NodePosition:
-    #     if parent_id is None:
-    #         node = self.root
-    #     else:
-    #         node = search.find(self._root, lambda node: node.name == parent_id)
-    #     return NodePosition(value, parent=node)
+    @property
+    def grid(self) -> NodePosition:
+        return self.find_by_id('GRID_ID')
+
+    def insert(self, item: ItemPosition, parent: Self) -> NodePosition:
+        return NodePositionParse.get_instance(item, item.type_, parent)
 
     def find_by_id(self, id: str):
-        return search.find(self._root, lambda node: node.name == id)
+        node = search.find(self._root, lambda node: node.name == id)
+        return node
 
     def print(self):
         # print(RenderTree(self.root, style=AsciiStyle()).by_attr())
@@ -100,3 +46,33 @@ class TreeNodePosition:
         self.__to_dict(self.root, values)
         return values
 
+    @classmethod
+    def __generate_tree(cls, position_id:str, data:dict, tree: Self):
+        parent_node = tree.find_by_id(position_id)
+        if position_id in data:
+            parent_node_value = data[position_id]
+            for child_position_id in parent_node_value.get("children", []):
+                position_node = tree.find_by_id(child_position_id)
+                if not position_node:
+                    type_ = data[child_position_id]['type']
+                    kwargs = data[child_position_id].copy()
+                    kwargs.pop('children')
+                    kwargs.pop('parents')
+                    metadata = data[child_position_id].get('meta', {})
+                    if metadata:
+                        kwargs.update(metadata)
+                    item_position = ItemPositionParse.get_instance(**kwargs)
+                    tree.insert(item_position, parent_node)
+                cls.__generate_tree(child_position_id, data, tree)
+
+    @classmethod
+    def from_dict(cls, data:dict):
+        tree = cls()
+        tree.root.item.parents = data['ROOT_ID'].get('parents', [])
+        tree.root.item.children = data['ROOT_ID']['children']
+
+        grid_node = tree.find_by_id('GRID_ID')
+        grid_node.item.parents = data['GRID_ID']['parents']
+
+        cls.__generate_tree('ROOT_ID', data, tree)
+        return tree
