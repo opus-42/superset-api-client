@@ -39,8 +39,8 @@ class Dashboard(Object):
 
     json_metadata: dict = json_field()
     position_json: dict = json_field()
-    metadata: Metadata = Metadata()
-    position: Metadataposition = Metadataposition()
+    metadata: Metadata = field(default_factory=Metadata)
+    position: Metadataposition = field(default_factory=Metadataposition)
 
 
     @property
