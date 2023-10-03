@@ -42,5 +42,10 @@ class AcceptChildError(Exception):
     def __init__(self, message='Item position does not allow including children'):
         super().__init__(message)
 
+
 class NodePositionValidationError(Exception):
+    pass
+
+
+def ChartValidationError(Exception):
     pass

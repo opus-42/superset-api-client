@@ -7,9 +7,9 @@ import pytest
 import requests
 import requests.exceptions
 
-from supersetapiclient.charts import Chart
+from supersetapiclient.charts.charts import Chart
 from supersetapiclient.client import SupersetClient, raise_for_status
-from supersetapiclient.dashboards import Dashboard
+from supersetapiclient.dashboards.dashboards import Dashboard
 from supersetapiclient.databases import Database
 from supersetapiclient.datasets import Dataset
 from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound, QueryLimitReached

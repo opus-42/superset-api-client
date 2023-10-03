@@ -1,47 +1,36 @@
 """Dashboards."""
 import json
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
-
-from supersetapiclient.base import Object, ObjectFactories, default_string, json_field, default_bool
+from typing import List, Optional
+from supersetapiclient.base.base import Object, ObjectFactories, default_string, json_field
 from supersetapiclient.dashboards.metadata import Metadata
 from supersetapiclient.dashboards.metadataposition import Metadataposition
+from supersetapiclient.utils import remove_fields_optional
+
+
+def defult_metadata():
+    return Metadata()
+
+def defult_metadata_position():
+    return Metadataposition()
 
 
 @dataclass
 class Dashboard(Object):
-    JSON_FIELDS = ['native_filter_configuration']
+    JSON_FIELDS = []
 
     dashboard_title: str
-    published: bool
+    published: bool = field(default=False)
     id: Optional[int] = None
-    certification_details: str = default_string()
-    certified_by: str = default_string()
-    created_by: str = default_string()
-    created_on_delta_humanized: str = default_string()
-    changed_by: str = default_string()
-    changed_by_name: str = default_string()
-    changed_by_url: str = default_string()
-    changed_on: str = default_string()
-    changed_on_delta_humanized: str = default_string()
-    changed_on_utc: str = default_string()
-    charts: List[str] = field(default_factory=list)
     css: str = default_string()
-    is_managed_externally: bool = default_bool()
-    native_filter_configuration: dict = json_field()
     slug: str = default_string()
-    status: str = default_string()
-    tags: List[str] = field(default_factory=list)
-    owners: List[int] = field(default_factory=list)
-    roles: List[int] = field(default_factory=list)
-    thumbnail_url: str = default_string()
-    url: str = default_string()
 
     json_metadata: dict = json_field()
     position_json: dict = json_field()
-    metadata: Metadata = field(default_factory=Metadata)
-    position: Metadataposition = field(default_factory=Metadataposition)
 
+    metadata: Optional[Metadata] = field(default_factory=defult_metadata)
+    position: Optional[Metadataposition] = field(default_factory=defult_metadata_position)
+    # charts: List[Chart] = field(default_factory=Chart)
 
     @property
     def colors(self) -> dict:
@@ -67,9 +56,15 @@ class Dashboard(Object):
             charts.append(c)
         return charts
 
+    @remove_fields_optional
+    def to_dict(self, columns=None):
+        data = super().to_dict(columns)
+        data['position_json'] = self.position.to_dict()
+        data['json_metadata'] = self.metadata.to_dict()
+        return data
+
+    @remove_fields_optional
     def to_json(self, columns=None):
-        if columns is None:
-            columns = self.field_names()
         data = super().to_json(columns)
         data['position_json'] = self.position.to_json()
         data['json_metadata'] = self.metadata.to_json()
@@ -77,12 +72,22 @@ class Dashboard(Object):
 
     @classmethod
     def from_json(cls, data: dict):
-        print(data)
-        obj = super().from_json(data)
-        obj.metadata = Metadata.from_json(json.loads(data['json_metadata']))
-        obj.position = Metadataposition.from_json(json.loads(data['position_json']))
+        data_result = data
+        if data.get('result'):
+            data_result = data['result']
+            obj = super().from_json(data_result)
+        else:
+            obj = super().from_json(data_result)
+
+        obj.metadata = Metadata.from_json(json.loads(data_result['json_metadata']))
+
+        obj.position = Metadata()
+        if data_result.get('position_json'):
+            obj.position = Metadataposition.from_json(json.loads(data_result['position_json']))
         return obj
+
 
 class Dashboards(ObjectFactories):
     endpoint = "dashboard/"
     base_object = Dashboard
+

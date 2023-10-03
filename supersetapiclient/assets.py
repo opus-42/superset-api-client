@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Union
 
-from supersetapiclient.base import raise_for_status
+from supersetapiclient.base.base import raise_for_status
 
 
 class Assets:

@@ -3,16 +3,16 @@ from typing import Dict
 from anytree import RenderTree, search
 from typing_extensions import Self
 
-from supersetapiclient.dashboards.itemposition import ItemPosition, _RootItemPosition, \
-    _GridItemPosition, ItemPositionType, ItemPositionParse
+from supersetapiclient.dashboards.itemposition import ItemPosition, RootItemPosition, \
+    GridItemPosition, ItemPositionType
 from supersetapiclient.dashboards.nodeposisition import NodePosition, TabNodePosition, \
     MarkdownNodePosition, NodePositionParse, GridNodePosition, RootNodePosition
 
 
 class TreeNodePosition:
     def __init__(self):
-        self._root = RootNodePosition(_RootItemPosition())
-        GridNodePosition(_GridItemPosition(), self._root)
+        self._root = RootNodePosition(RootItemPosition())
+        GridNodePosition(GridItemPosition(), self._root)
 
     @property
     def root(self) -> NodePosition:
@@ -61,7 +61,9 @@ class TreeNodePosition:
                     metadata = data[child_position_id].get('meta', {})
                     if metadata:
                         kwargs.update(metadata)
-                    item_position = ItemPositionParse.get_instance(**kwargs)
+                    # if metadata.get('chartId'):
+                    #     breakpoint()
+                    item_position = ItemPosition.get_instance(**kwargs)
                     tree.insert(item_position, parent_node)
                 cls.__generate_tree(child_position_id, data, tree)
 

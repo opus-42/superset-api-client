@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from supersetapiclient.base import Object, ObjectFactories
+from supersetapiclient.base.base import Object, ObjectFactories, QueryStringFilter
 
 
 @dataclass
@@ -41,6 +41,20 @@ class Dataset(Object):
         return self._parent.client.run(database_id=self.database_id, query=self.sql, query_limit=query_limit)
 
 
+
+
+
+
 class Datasets(ObjectFactories):
     endpoint = "dataset/"
     base_object = Dataset
+
+    # list of supported filters
+    # http://localhost:8088/api/v1/dataset/_info?q=(keys:!(filters))
+
+    def get_id_by_name(self, name):
+        filter = QueryStringFilter()
+        filter.add('table_name', 'eq', name)
+        objects = self.find(filter)
+        if objects:
+            return objects[0].id

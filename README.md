@@ -10,6 +10,7 @@ This is a Alpha version. Stability is not guaranteed.
 ## Usage
 
 Setup a superset client:
+
 ```python3
 from supersetapiclient.client import SupersetClient
 

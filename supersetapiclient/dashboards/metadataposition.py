@@ -1,11 +1,12 @@
 import json
 from dataclasses import dataclass
-from typing import ClassVar
 
-from supersetapiclient.base import Object, default_string
+from supersetapiclient.base.base import Object
+from supersetapiclient.charts.charts import Chart
 from supersetapiclient.dashboards.itemposition import TabItemPosition, MarkdownItemPosition, ItemPosition, \
-    ItemPositionType, ItemPositionParse
-from supersetapiclient.dashboards.nodeposisition import MarkdownNodePosition, TabNodePosition, NodePosition
+    ChartItemPosition
+from supersetapiclient.dashboards.nodeposisition import MarkdownNodePosition, TabNodePosition, NodePosition, \
+    ChartNodePosition
 from supersetapiclient.dashboards.treenodeposisition import TreeNodePosition
 
 
@@ -38,13 +39,25 @@ class Metadataposition(Object):
         obj._tree = TreeNodePosition.from_dict(data)
         return obj
 
-    def add_tab(self, title: str, parent_id: str) -> TabNodePosition:
-        parent = self.tree.find_by_id(parent_id)
+    def add_tab(self, title: str, parent: ItemPosition = None) -> TabNodePosition:
+        if not parent:
+            parent = self.tree.grid
         return self.tree.insert(TabItemPosition(text=title), parent)
 
-    def add_markdown(self, markdown: str, parent_id: str, height: int = 50, width: int = 4) -> MarkdownNodePosition:
-        parent = self.tree.find_by_id(parent_id)
-        return self.tree.insert(MarkdownItemPosition(code=markdown, height=height, width=width), parent)
+    def add_markdown(self, markdown: str, parent: ItemPosition = None, height: int = 50, width: int = 4, relocate:bool = True) -> MarkdownNodePosition:
+        if not parent:
+            parent = self.tree.grid
+        return self.tree.insert(MarkdownItemPosition(code=markdown, height=height, width=width, relocate=relocate), parent)
 
     def add(self, item: ItemPosition, parent: ItemPosition) -> NodePosition:
         return self.tree.insert(item, parent)
+
+    def add_chart(self, chart:Chart, parent: ItemPosition = None, height: int = 50, width: int = 4, relocate:bool = True) -> ChartNodePosition:
+        if not parent:
+            parent = self.tree.grid
+        return self.tree.insert(ChartItemPosition(chartId=chart.id,
+                                                  sliceName=chart.slice_name,
+                                                  sliceNameOverride=chart.slice_name_override,
+                                                  height=height,
+                                                  width=width,
+                                                  relocate=relocate), parent)

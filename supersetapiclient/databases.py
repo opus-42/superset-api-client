@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from supersetapiclient.base import Object, ObjectFactories, default_string, json_field
+from supersetapiclient.base.base import Object, ObjectFactories, default_string, json_field
 
 
 @dataclass

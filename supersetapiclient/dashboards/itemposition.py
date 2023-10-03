@@ -1,11 +1,11 @@
 """Dashboard Nodes Objects."""
 
 import json
-import inspect
 from enum import Enum
-from dataclasses import dataclass, field, asdict, InitVar, Field, make_dataclass
-from typing import List, ClassVar, Dict
-from supersetapiclient.base import Object, default_string
+from dataclasses import dataclass, field, asdict, make_dataclass
+from typing import List
+from supersetapiclient.base.enum_str import StringEnum
+from supersetapiclient.base.parse import ParseMixin
 from supersetapiclient.exceptions import ItemPositionValidationError, NodePositionValidationError
 from supersetapiclient.utils import generate_uuid
 
@@ -15,8 +15,7 @@ def _asdict(data):
         for field, value in data
     }
 
-class ItemPositionType(Enum):
-    NONE = None
+class ItemPositionType(StringEnum):
     ROOT = 'ROOT'
     GRID = 'GRID'
     TABS = 'TABS'
@@ -27,14 +26,11 @@ class ItemPositionType(Enum):
     MARKDOWN = 'MARKDOWN'
     DIVIDER = 'DIVIDER'
 
-    def __str__(self):
-        return str(self.value)
 
-    def __eq__(self, other):
-        if str(self.__class__) == str(other.__class__):
-            return self.value == other.value
-        return False
-
+class PositionType(StringEnum):
+    LEFT = 'LEFT'
+    RIGHT = 'RIGHT'
+    BOTTOM = 'BOTTOM'
 
 @dataclass
 class MetaItemPosition:
@@ -54,13 +50,14 @@ class MetaItemPosition:
 
 
 @dataclass
-class ItemPosition:
+class ItemPosition(ParseMixin):
     ACCEPT_CHILD = True
+    MAX_WIDTH = 12
 
     id: str = field(init=False, repr=False)
     type_: ItemPositionType = field(init=False, repr=False)
-    children: List[str] = field(default_factory=list)
-    parents: List[str] = field(default_factory=list)
+    children: List[str] = field(default_factory=set)
+    parents: List[str] = field(default_factory=set)
 
     def __init__(self, **kwargs):
         type_ = kwargs.get('type_') or kwargs.get('type')
@@ -73,6 +70,12 @@ class ItemPosition:
             self.children = kwargs.get('children', [])
         if not hasattr(self, 'parents'):
             self.parents = kwargs.get('parents', [])
+
+        if kwargs.get('meta'):
+            if hasattr(self, 'meta'):
+                self.meta.__dict__.update(kwargs['meta'])
+            else:
+                self.meta = kwargs['meta']
 
     def to_dict(self):
         data = asdict(self, dict_factory=_asdict)
@@ -91,17 +94,32 @@ class ItemPosition:
     def get_new_uuid(self):
         return generate_uuid(f'{self.type_}-')
 
-class _RootItemPosition(ItemPosition):
+
+class Position:
+    def __init__(self, item:ItemPosition, position:PositionType = PositionType.BOTTOM):
+        self._item = item
+        self._position = position
+
+    @property
+    def item(self):
+        return self._item
+
+    @property
+    def position(self):
+        return self._position
+
+
+class RootItemPosition(ItemPosition):
     def __init__(self, **kwargs):
         super().__init__(type_=ItemPositionType.ROOT, id='ROOT_ID', **kwargs)
 
 
-class _GridItemPosition(ItemPosition):
+class GridItemPosition(ItemPosition):
     def __init__(self, **kwargs):
         super().__init__(type_=ItemPositionType.GRID, id='GRID_ID', **kwargs)
 
 
-class _TabsItemPosition(ItemPosition):
+class TabsItemPosition(ItemPosition):
     def __init__(self, **kwargs):
         self.meta = MetaItemPosition({})
         super().__init__(type_=ItemPositionType.TABS, **kwargs)
@@ -128,7 +146,7 @@ class TabItemPosition(ItemPosition):
     def placeholder(self):
         return self.meta.placeholder
 
-class _RowItemPosition(ItemPosition):
+class RowItemPosition(ItemPosition):
     def __init__(self, background: str = 'BACKGROUND_TRANSPARENT', **kwargs):
         self.meta = MetaItemPosition({
             'background': background
@@ -139,13 +157,15 @@ class _RowItemPosition(ItemPosition):
     def background(self):
         return self.meta.background
 
-class MarkdownItemPosition(ItemPosition):
-    ACCEPT_CHILD = False
-    MAX_WIDTH = 12
+class RelocateMixin:
+    def __init__(self, relocate:bool, **kwargs):
+        self.relocate = relocate
 
-    def __init__(self, code:str='', height: int = 50, width: int = 4, **kwargs):
-        if width > MarkdownItemPosition.MAX_WIDTH:
-            raise NodePositionValidationError(f'Maximum width allowed is  {self.MAX_WIDTH}')
+        width = self.meta.width
+        height =self.meta.height
+
+        if not relocate and width > ItemPosition.MAX_WIDTH:
+            raise NodePositionValidationError(f'Maximum width allowed is  {ItemPosition.MAX_WIDTH}')
 
         if width <= 0:
             raise NodePositionValidationError('Width must be greater than zero')
@@ -153,12 +173,21 @@ class MarkdownItemPosition(ItemPosition):
         if height <= 0:
             raise NodePositionValidationError('Height must be greater than zero')
 
-        self.meta = MetaItemPosition({
+        super().__init__(**kwargs)
+
+
+class MarkdownItemPosition(RelocateMixin, ItemPosition):
+    ACCEPT_CHILD = False
+
+    def __init__(self, code:str='', height: int = 50, width: int = 4, relocate:bool = True, **kwargs):
+        _meta = {
             'code': code,
             'height': height,
             'width': width
-        })
-        super().__init__(type_=ItemPositionType.MARKDOWN, **kwargs)
+        }
+        self.meta = MetaItemPosition(_meta)
+
+        super().__init__(relocate=relocate, type_=ItemPositionType.MARKDOWN, **kwargs)
 
     @property
     def code(self):
@@ -179,25 +208,35 @@ class DividerItemPosition(ItemPosition):
         super().__init__(type_=ItemPositionType.DIVIDER, **kwargs)
 
 
-class ItemPositionParse:
-    PARSE = {
-        'ROOT': _RootItemPosition,
-        'GRID': _GridItemPosition,
-        'TABS': _TabsItemPosition,
-        'TAB': TabItemPosition,
-        'ROW': _RowItemPosition,
-        'MARKDOWN': MarkdownItemPosition,
-        'DIVIDER': DividerItemPosition
-    }
+class ChartItemPosition(RelocateMixin, ItemPosition):
+    ACCEPT_CHILD = False
+    def __init__(self, chartId: int, sliceName: str, sliceNameOverride: str = None, height: int = 50, width: int = 4, uuid: str = None, relocate:bool = True, **kwargs):
+        _meta = {
+            'chartId': chartId,
+            'sliceName': sliceName,
+            'sliceNameOverride': sliceNameOverride,
+            'height': height,
+            'width': width
+        }
+        if uuid:
+            _meta.update({'uuid':uuid})
 
-    @classmethod
-    def get_instance(cls, **kwargs):
-        type_ = kwargs.get('type') or kwargs.get('type_')
-        if not type_:
-            raise ItemPositionValidationError(f'type_ argument cannot be empty.')
-        ItemPositionClass = cls.get_class(type_)
-        return ItemPositionClass(**kwargs)
+        self.meta = MetaItemPosition(_meta)
+        super().__init__(relocate=relocate, type_=ItemPositionType.CHART, **kwargs)
 
-    @classmethod
-    def get_class(cls, type_: str):
-        return cls.PARSE.get(type_, ItemPosition)
+    @property
+    def chart_id(self):
+        return self.meta.chartId
+
+    @property
+    def slice_name(self):
+        return self.meta.sliceName
+
+    @property
+    def width(self):
+        return self.meta.width
+
+    @property
+    def height(self):
+        return self.meta.height
+

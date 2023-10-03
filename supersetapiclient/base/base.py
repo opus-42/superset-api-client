@@ -1,8 +1,9 @@
 """Base classes."""
 import dataclasses
-import re
-from dataclasses import make_dataclass
-import logging
+from enum import Enum
+
+from supersetapiclient.base.parse import ParseMixin
+from supersetapiclient.client import QueryStringFilter
 
 try:
     from functools import cached_property
@@ -13,25 +14,33 @@ except ImportError:  # pragma: no cover
 import json
 import os.path
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Dict
 
 import yaml
 from requests import HTTPError
 
 from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound
 
-logger = logging.getLogger(__name__)
 
 
-def json_field():
-    return dataclasses.field(default=None, repr=False)
+
+def json_field(**kwargs):
+    if not kwargs.get('default'):
+        kwargs['default']=None
+
+    return dataclasses.field(repr=False, **kwargs)
 
 
-def default_string(default: str = ""):
-    return dataclasses.field(default=default, repr=False)
+def default_string(**kwargs):
+    if not kwargs.get('default'):
+        kwargs['default']=''
 
-def default_bool(default:bool = False):
-    return dataclasses.field(default=default, repr=False)
+    return dataclasses.field(repr=False, **kwargs)
+
+def default_bool(**kwargs):
+    if not kwargs.get('default'):
+        kwargs['default']=False
+    return dataclasses.field(repr=False)
 
 def raise_for_status(response):
     try:
@@ -49,17 +58,32 @@ def raise_for_status(response):
         raise BadRequestError(*e.args, request=e.request, response=e.response, message=error_msg) from None
 
 
-class Object:
+class Object(ParseMixin):
     _parent = None
     JSON_FIELDS = []
 
-    @classmethod
-    def fields(cls):
-        """Get field names."""
-        return dataclasses.fields(cls)
+    _extra_fields: Dict = dataclasses.field(default_factory=dict)
 
     @classmethod
-    def field_names(cls):
+    def _get_type(cls, data):
+        return None
+
+    @property
+    def extra_fields(self):
+        return self._extra_fields
+
+    @classmethod
+    def fields(cls) -> set:
+        """Get field names."""
+        _fields = set()
+        for n, f in cls.__dataclass_fields__.items():
+            if isinstance(f, dataclasses.Field):
+                _fields.add(f)
+        _fields.update(dataclasses.fields(cls))
+        return _fields
+
+    @classmethod
+    def field_names(cls) -> list:
         """Get field names."""
         fields = []
         for f in cls.fields():
@@ -68,40 +92,52 @@ class Object:
         return fields
 
     @classmethod
+    def required_fields(cls, data) -> dict:
+        rdata = {}
+        for f in cls.fields():
+            if f.default is dataclasses.MISSING and not isinstance(f.default, Object):
+                rdata[f.name] = data.get(f.name)
+        return rdata
+
+    @classmethod
+    def __get_extra_fields(cls, data) -> dict:
+        field_names = set(cls.field_names())
+
+        data_keys = set(data.keys())
+        extra_fields_keys = data_keys - field_names
+        extra_fields = {}
+        for field_name in extra_fields_keys:
+            extra_fields[field_name] = data.pop(field_name)
+        return extra_fields
+
+    @classmethod
     def from_json(cls, data: dict):
-        """Create Object from json
+        extra_fields = cls.__get_extra_fields(data)
+        obj = cls(**data)
+        obj._extra_fields = extra_fields
+        return obj
 
-        Args:
-            json (dict): a dictionary
-
-        Returns:
-            Object: return the related object
-        """
-        field_names = cls.field_names()
-        return cls(**{k: v for k, v in data.items() if k in field_names})
-
-    # @classmethod
-    # def from_json(cls, data: dict):
-    #     # cls_name = re.findall(r"\.(\w+)", str(cls))[-1]
-    #     # Dataclasse = make_dataclass(cls_name, data.keys())
-    #     obj = cls(**data)
-    #     return obj
-
-    def to_dict(self, columns):
+    def to_dict(self, columns=[]) -> dict:
+        columns_names = set(columns or [])
+        columns_names.update(self.field_names())
         o = {}
-        for c in columns:
+        for c in columns_names:
             if not hasattr(self, c):
                 # Column that is not implemented yet
                 continue
             value = getattr(self, c)
+            if isinstance(value, Enum):
+                value = str(value)
             if c in self.JSON_FIELDS:
                 value = json.dumps(value)
             o[c] = value
         return o
 
-    def to_json(self, columns):
-        return self.to_dict(columns)
-
+    def to_json(self, columns=[]) -> dict:
+        data = self.to_dict(columns)
+        if data.get('extra_fields'):
+            data.pop('extra_fields')
+        return data
 
     def __post_init__(self):
         for f in self.JSON_FIELDS:
@@ -132,6 +168,11 @@ class Object:
     def save(self) -> None:
         """Save object information."""
         o = self.to_json(columns=self._parent.edit_columns)
+
+        print('>>> base.add')
+        from pprint import pprint
+        pprint(o)
+
         response = self._parent.client.put(self.base_url, json=o)
         raise_for_status(response)
 
@@ -145,6 +186,7 @@ class ObjectFactories:
 
     _INFO_QUERY = {"keys": ["add_columns", "edit_columns"]}
 
+
     def __init__(self, client):
         """Create a new Dashboards endpoint.
 
@@ -153,11 +195,17 @@ class ObjectFactories:
         """
         self.client = client
 
+    @classmethod
+    def get_base_object(cls, data):
+        type_ = cls.base_object._get_type(data)
+        if type_:
+            return cls.base_object.get_class(type_)
+        return cls.base_object
+
     @cached_property
     def _infos(self):
         # Get infos
         response = self.client.get(self.info_url, params={"q": json.dumps(self._INFO_QUERY)})
-
         raise_for_status(response)
         return response.json()
 
@@ -186,35 +234,33 @@ class ObjectFactories:
     def export_url(self):
         return self.client.join_urls(self.base_url, "export/")
 
-    def get(self, id_or_slug: str):
+    def get(self, id: str):
         """Get an object by id."""
-        url = self.client.join_urls(self.base_url, id_or_slug)
+        url = self.client.join_urls(self.base_url, id)
+
         response = self.client.get(url)
         raise_for_status(response)
-        response = response.json()
-        object_json = response.get("result")
-        object_json["id"] = id_or_slug
-        object = self.base_object.from_json(object_json)
+
+        result = response.json()
+
+        data_result = result['result']
+        result["id"] = id
+
+        BaseClass = self.get_base_object(data_result)
+        object = BaseClass.from_json(data_result)
+
         object._parent = self
 
         return object
 
-    def find(self, page_size: int = 100, page: int = 0, **kwargs):
+    def find(self, filter:QueryStringFilter, columns:List[str]=[], page_size: int = 100, page: int = 0):
         """Find and get objects from api."""
-        # Get response
-        query = {
-            "page_size": page_size,
-            "page": page,
-            "filters": [{"col": k, "opr": "eq", "value": v} for k, v in kwargs.items()],
-        }
-        params = {"q": json.dumps(query)}
-        response = self.client.get(self.base_url, params=params)
-        raise_for_status(response)
-        response = response.json()
+
+        response = self.client.find(self.base_url, filter, columns, page_size, page)
 
         objects = []
         for r in response.get("result"):
-            o = self.base_object.from_json(r)
+            o = self.get_base_object().from_json(r)
             o._parent = self
             objects.append(o)
 
@@ -226,19 +272,24 @@ class ObjectFactories:
         raise_for_status(response)
         return response.json()["count"]
 
-    def find_one(self, **kwargs):
+    def find_one(self, filter:QueryStringFilter, columns:List[str]=[]):
         """Find only object or raise an Exception."""
-        objects = self.find(**kwargs)
+        objects = self.find(filter, columns)
         if len(objects) == 0:
-            raise NotFound(f"No {self.base_object.__name__} found")
+            raise NotFound(f"No {self.get_base_object().__name__} found")
         if len(objects) > 1:
-            raise MultipleFound(f"Multiple {self.base_object.__name__} found")
+            raise MultipleFound(f"Multiple {self.get_base_object().__name__} found")
         return objects[0]
 
     def add(self, obj) -> int:
         """Create an object on remote."""
 
         o = obj.to_json(columns=self.add_columns)
+
+        print('>>> base.add')
+        from pprint import pprint
+        pprint(o)
+
         response = self.client.post(self.base_url, json=o)
         raise_for_status(response)
         obj.id = response.json().get("id")

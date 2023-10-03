@@ -1,7 +1,11 @@
 """A Superset REST Api Client."""
 import getpass
+import json
 import logging
 import urllib.parse
+from typing import List
+
+from supersetapiclient.query_string import QueryStringFilter
 
 try:
     from functools import cached_property
@@ -14,8 +18,8 @@ import requests.exceptions
 import requests_oauthlib
 
 from supersetapiclient.assets import Assets
-from supersetapiclient.base import raise_for_status
-from supersetapiclient.charts import Charts
+from supersetapiclient.base.base import raise_for_status
+from supersetapiclient.charts.charts import Charts
 from supersetapiclient.dashboards.dashboards import Dashboards
 from supersetapiclient.databases import Databases
 from supersetapiclient.datasets import Datasets
@@ -239,6 +243,22 @@ class SupersetClient:
         )
         raise_for_status(csrf_response)  # Check CSRF Token went well
         return csrf_response.json().get("result")
+
+    def find(self, url, filter:QueryStringFilter, columns:List[str]=[], page_size: int = 100, page: int = 0):
+        """Find and get objects from api."""
+
+        query = {
+            "page_size": page_size,
+            "page": page,
+            "filters": filter.filters,
+            "columns" :columns
+        }
+
+        params = {"q": json.dumps(query)}
+
+        response = self.get(url, params=params)
+        raise_for_status(response)
+        return response.json()
 
 
 class NoVerifyHTTPAdapter(requests.adapters.HTTPAdapter):
