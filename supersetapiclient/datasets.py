@@ -41,10 +41,6 @@ class Dataset(Object):
         return self._parent.client.run(database_id=self.database_id, query=self.sql, query_limit=query_limit)
 
 
-
-
-
-
 class Datasets(ObjectFactories):
     endpoint = "dataset/"
     base_object = Dataset
@@ -55,6 +51,5 @@ class Datasets(ObjectFactories):
     def get_id_by_name(self, name):
         filter = QueryStringFilter()
         filter.add('table_name', 'eq', name)
-        objects = self.find(filter)
-        if objects:
-            return objects[0].id
+        obj = self.find_one(filter, ['id'])
+        return obj.id

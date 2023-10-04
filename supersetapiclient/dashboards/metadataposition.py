@@ -21,13 +21,14 @@ class Metadataposition(Object):
     def tree(self):
         return self._tree
 
-    def to_dict(self):
-        data = super().to_dict(self.field_names())
+    def to_dict(self, columns=None):
+        # data = super().to_dict(self.field_names())
+        data = super().to_dict()
         data.update(self.tree.to_dict())
         return data
 
-    def to_json(self, columns=None):
-        return json.dumps(self.to_dict())
+    # def to_json(self, columns=None):
+    #     return json.dumps(self.to_dict())
 
     @classmethod
     def from_json(cls, data: dict):

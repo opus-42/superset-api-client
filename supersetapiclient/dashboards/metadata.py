@@ -6,7 +6,7 @@ from supersetapiclient.base.base import Object, default_string, json_field
 
 @dataclass
 class Metadata(Object):
-    JSON_FIELDS = []
+    JSON_FIELDS = ['default_filters']
 
     color_scheme: str = default_string()
     refresh_frequency: int = field(default=0)
@@ -21,19 +21,19 @@ class Metadata(Object):
     global_chart_configuration: Dict = field(default_factory=dict)
     default_filters: Dict = field(default_factory=dict)
 
-    def to_dict(self, columns=None):
-        data = super().to_dict(columns)
-        # breakpoint()
-        # data['shared_label_colors']
-        return data
+    # def to_dict(self, columns=None):
+    #     data = super().to_dict(columns)
+    #     # breakpoint()
+    #     # data['shared_label_colors']
+    #     return data
 
-    def to_json(self, columns=None):
-        data = super().to_json(columns)
-        if isinstance(data['default_filters'], dict):
-            data['default_filters'] = json.dumps(data['default_filters'])
+    # def to_json(self, columns=None):
+    #     data = super().to_json(columns)
+    #     if isinstance(data['default_filters'], dict):
+    #         data['default_filters'] = json.dumps(data['default_filters'])
+    #
+    #     return json.dumps(data)
 
-        return json.dumps(data)
-
-    @classmethod
-    def from_json(cls, data: dict):
-        return super().from_json(data)
+    # @classmethod
+    # def from_json(cls, data: dict):
+    #     return super().from_json(data)

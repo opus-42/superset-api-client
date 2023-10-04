@@ -3,7 +3,7 @@ import unicodedata
 
 import inspect
 import logging
-from typing import Union
+from typing import Union, get_origin
 
 import shortuuid
 
@@ -42,7 +42,7 @@ def logger(func):
 
 def remove_fields_optional(func):
     """
-    Remove from data fields optional null or empty
+    Remove from data fields optional
     :param data:
     :return:
     """
@@ -50,13 +50,14 @@ def remove_fields_optional(func):
     def wrapper(*args, **kwargs):
         data = func(*args, **kwargs)
         self = args[0]
-        for f in self.fields():
+        for field in self.fields():
             try:
-                if f.type.__dict__.get('__origin__') and f.type.__origin__ is Union:
+                # if f.type.__dict__.get('__origin__') and f.type.__origin__ is Union:
+                if get_origin(field.type) is Union:
                     try:
-                        data.pop(f.name)
+                        data.pop(field.name)
                     except KeyError:
-                        print('>>> erro ao remover: ', f.name)
+                        print('>>> erro ao remover: ', field.name)
             except AttributeError:
                 pass
         return data

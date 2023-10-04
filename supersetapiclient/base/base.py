@@ -2,8 +2,11 @@
 import dataclasses
 from enum import Enum
 
+from typing_extensions import Self
+
 from supersetapiclient.base.parse import ParseMixin
 from supersetapiclient.client import QueryStringFilter
+from supersetapiclient.utils import remove_fields_optional
 
 try:
     from functools import cached_property
@@ -14,14 +17,12 @@ except ImportError:  # pragma: no cover
 import json
 import os.path
 from pathlib import Path
-from typing import List, Union, Dict
+from typing import List, Union, Dict, get_args, get_origin
 
 import yaml
 from requests import HTTPError
 
 from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound
-
-
 
 
 def json_field(**kwargs):
@@ -76,11 +77,20 @@ class Object(ParseMixin):
     def fields(cls) -> set:
         """Get field names."""
         _fields = set()
+
         for n, f in cls.__dataclass_fields__.items():
             if isinstance(f, dataclasses.Field):
                 _fields.add(f)
+
         _fields.update(dataclasses.fields(cls))
+
         return _fields
+
+    @classmethod
+    def get_field(cls, name):
+        for f in cls.fields():
+            if f.name == name:
+                return f
 
     @classmethod
     def field_names(cls) -> list:
@@ -101,6 +111,9 @@ class Object(ParseMixin):
 
     @classmethod
     def __get_extra_fields(cls, data) -> dict:
+        if not data:
+            return {}
+
         field_names = set(cls.field_names())
 
         data_keys = set(data.keys())
@@ -108,19 +121,57 @@ class Object(ParseMixin):
         extra_fields = {}
         for field_name in extra_fields_keys:
             extra_fields[field_name] = data.pop(field_name)
+
         return extra_fields
 
     @classmethod
-    def from_json(cls, data: dict):
+    def from_json(cls, data: dict) -> Self:
         extra_fields = cls.__get_extra_fields(data)
         obj = cls(**data)
+
+        for field_name in cls.JSON_FIELDS:
+            data_value = data.get(field_name)
+            if isinstance(data_value, str):
+                field = cls.get_field(field_name)
+                if get_origin(field.type) is Union:
+                    ObjectClass = get_args(field.type)[0]
+                else:
+                    ObjectClass = field.type
+
+                if ObjectClass is Dict:
+                    value = json.loads(data_value)
+                else:
+                    value = ObjectClass.from_json(json.loads(data[field_name]))
+
+                setattr(obj, field_name, value)
+
+        for field_name, data_value in data.items():
+            if isinstance(data_value, dict):
+                field = cls.get_field(field_name)
+                ObjectClass = field.type
+                if not issubclass(ObjectClass, Dict):
+                    value = ObjectClass.from_json(data_value)
+                    setattr(obj, field_name, value)
+            elif isinstance(data_value, list):
+                instance_is_object = False
+                objects = []
+                for field_value in data_value:
+                    if isinstance(field_value, dict):
+                        instance_is_object = True
+                        field = cls.get_field(field_name)
+                        ObjectClass = get_args(field.type)[0]
+                        value = ObjectClass.from_json(field_value)
+                        objects.append(value)
+                if instance_is_object:
+                    setattr(obj, field_name, objects)
+
         obj._extra_fields = extra_fields
         return obj
 
     def to_dict(self, columns=[]) -> dict:
         columns_names = set(columns or [])
         columns_names.update(self.field_names())
-        o = {}
+        data = {}
         for c in columns_names:
             if not hasattr(self, c):
                 # Column that is not implemented yet
@@ -128,20 +179,47 @@ class Object(ParseMixin):
             value = getattr(self, c)
             if isinstance(value, Enum):
                 value = str(value)
-            if c in self.JSON_FIELDS:
-                value = json.dumps(value)
-            o[c] = value
-        return o
+            if isinstance(value, Object):
+                value = value.to_dict()
+            if isinstance(value, list):
+                instance_is_object = False
+                values_data = []
+                for obj in value:
+                    if isinstance(obj, Object):
+                        instance_is_object = True
+                        values_data.append(obj.to_dict())
+                if instance_is_object:
+                    value = values_data
+            data[c] = value
+        return data
 
+    def __remove_field_starting_shyphen(self, data):
+        fields = list(data.keys())
+        for field in fields:
+            if fields[0] == "_":
+                data.pop(field)
+
+    @remove_fields_optional
     def to_json(self, columns=[]) -> dict:
         data = self.to_dict(columns)
+        for field in self.JSON_FIELDS:
+            obj = getattr(self, field)
+            if isinstance(obj, Object):
+                data[field] = json.dumps(obj.to_json())
+            elif isinstance(obj, dict):
+                data[field] = json.dumps(data[field])
+
+        self.__remove_field_starting_shyphen(data)
+
         if data.get('extra_fields'):
             data.pop('extra_fields')
         return data
 
     def __post_init__(self):
         for f in self.JSON_FIELDS:
-            setattr(self, f, json.loads(getattr(self, f) or "{}"))
+            value = getattr(self, f) or "{}"
+            if isinstance(value, str):
+                setattr(self, f, json.loads(value))
 
     @property
     def base_url(self) -> str:
@@ -169,7 +247,7 @@ class Object(ParseMixin):
         """Save object information."""
         o = self.to_json(columns=self._parent.edit_columns)
 
-        print('>>> base.add')
+        print('>>> base.save ', self.base_url)
         from pprint import pprint
         pprint(o)
 
@@ -259,8 +337,8 @@ class ObjectFactories:
         response = self.client.find(self.base_url, filter, columns, page_size, page)
 
         objects = []
-        for r in response.get("result"):
-            o = self.get_base_object().from_json(r)
+        for data in response.get("result"):
+            o = self.get_base_object(data).from_json(data)
             o._parent = self
             objects.append(o)
 
@@ -286,7 +364,7 @@ class ObjectFactories:
 
         o = obj.to_json(columns=self.add_columns)
 
-        print('>>> base.add')
+        print('\n>>> base.add ', self.base_url)
         from pprint import pprint
         pprint(o)
 

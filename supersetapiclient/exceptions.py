@@ -47,5 +47,5 @@ class NodePositionValidationError(Exception):
     pass
 
 
-def ChartValidationError(Exception):
+class ChartValidationError(Exception):
     pass

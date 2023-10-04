@@ -13,7 +13,7 @@ from supersetapiclient.charts.queries import QueryFilterClause
 from supersetapiclient.charts.query_context import QueryContext, PieQueryContext
 from supersetapiclient.charts.types import ChartType, FilterOperationType, FilterClausesType, FilterExpressionType, \
     DatasourceType
-from supersetapiclient.dashboards.itemposition import Position
+from supersetapiclient.dashboards.itemposition import Position, ItemPosition
 from supersetapiclient.dashboards.nodeposisition import RowNodePosition
 from supersetapiclient.exceptions import NotFound, ChartValidationError
 from supersetapiclient.utils import remove_fields_optional
@@ -21,7 +21,7 @@ from supersetapiclient.utils import remove_fields_optional
 
 @dataclass
 class Chart(Object):
-    JSON_FIELDS = []
+    JSON_FIELDS = ['params', 'query_context']
 
     slice_name: str
 
@@ -41,12 +41,19 @@ class Chart(Object):
     params: Optional[Option] = field(default_factory=Option)
     query_context: Optional[QueryContext] = field(default_factory=QueryContext)
 
-    datasource_id: str = default_string(default=None)
+    datasource_id: str = field(default=None)
     datasource_type: DatasourceType = DatasourceType.TABLE
 
     def __post_init__(self):
         from supersetapiclient.dashboards.dashboards import Dashboard
         self._dashboards = Dashboard(dashboard_title='')
+
+        if self.id is None and self.datasource_id is None:
+            raise ChartValidationError("""
+                When id is None, argument datasource id becomes mandatory. 
+                We recommend using the [client_superset].datasets.get_id_by_name('name_dataset') method 
+                to get the dataset id by name.
+            """)
 
     @classmethod
     def _get_type(self, data):
@@ -81,7 +88,7 @@ class Chart(Object):
         if prefix is None:
             return self._extra_fields.get('description_columns', {})
 
-    def clone(self, slice_name:str = None, slice_name_override:str = None, dashboard_position:Position = None, clear_filter:bool = True) -> Self:
+    def clone(self, slice_name:str = None, slice_name_override:str = None, clear_filter:bool = True) -> Self:
         new_chart = copy.deepcopy(self)
         new_chart.slice_name = slice_name or f'{new_chart.slice_name}_clone'
         new_chart.slice_name_override = slice_name_override or f'Chart clone de {new_chart.slice_name}'
@@ -158,38 +165,17 @@ class Chart(Object):
         query_filter_clause = QueryFilterClause(col=column_name, val=value, op=operator)
         self.query_context.queries[0].filters.append(query_filter_clause)
 
-    def to_dict(self, columns=None):
-        data = super().to_dict(columns)
-        if data.get('id'):
-            data['id'] = data['id']
+    # def to_dict(self, columns=None):
+    #     data = super().to_dict(columns)
+    #     if data.get('id'):
+    #         data['id'] = data['id']
+    #
+    #     return data
 
-        data['params'] = self.params.to_dict()
-        data['query_context'] = self.query_context.to_dict()
-
-        dashboards = []
-        data['extra_fields'] = self.extra_fields
-
-        # for dashboard in self._dashboards:
-        #     dashboard_dict = dashboard.to_dict()
-        #     dashboard_data = {}
-        #     columns = self.get_show_columns(prefix='dashboard')
-        #     for column in columns:
-        #         dashboard_data[column] = dashboard_dict[column]
-        #     dashboards.append(dashboard_data)
-        # data['dashboards'] = dashboards
-
-        return data
-
-    @remove_fields_optional
+    # @remove_fields_optional
     def to_json(self, columns=None):
         data = super().to_json(columns)
         data['dashboards'] = self.params.dashboards
-        data['params'] = self.params.to_json()
-        data['query_context'] = self.query_context.to_json()
-
-        if data.get('_dashboards') is not None:
-            data.pop('_dashboards')
-
         return data
 
     @classmethod
@@ -197,14 +183,6 @@ class Chart(Object):
         from supersetapiclient.dashboards.dashboards import Dashboard
 
         obj = super().from_json(data)
-        obj.id = data['id']
-
-        type_ = cls._get_type(data)
-        OptionClass = Option.get_class(type_)
-        obj.params = OptionClass.from_json(json.loads(data['params']))
-
-        QueryContextClass = QueryContext.get_class(type_)
-        obj.query_context = QueryContextClass.from_json(json.loads(data['query_context']))
 
         dashboards = []
         for dashboard in obj.extra_fields.get('dashboards', []):
@@ -218,7 +196,6 @@ class Chart(Object):
             obj.datasource_type = datasource.type
 
         return obj
-
 
 
 class Charts(ObjectFactories):
@@ -259,17 +236,19 @@ class Charts(ObjectFactories):
         raise_for_status(response)
         return response.json().result('result')
 
-    def add(self, chart) -> int:
+    def add(self, chart, parent: ItemPosition = None) -> int:
         id = super().add(chart)
         chart.id = id
 
         if chart.dashboard:
             dashboard = self.client.dashboards.get(chart.dashboard.id)
-            grid = dashboard.position.tree.grid
-            node_position = grid.children[-1]
 
-            if not isinstance(node_position, RowNodePosition):
-                node_position = grid
+            node_position = parent
+            if not node_position:
+                grid = dashboard.position.tree.grid
+                node_position = grid.children[-1]
+                if not isinstance(node_position, RowNodePosition):
+                    node_position = grid
             # from pprint import pprint
             # pprint(dashboard.to_dict())
             # breakpoint()
@@ -285,3 +264,12 @@ class PieChart(Chart):
     viz_type: ChartType = ChartType.PIE
     params: PieOption = field(default_factory=PieOption)
     query_context: PieQueryContext = field(default_factory=PieQueryContext)
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.id is None:
+            for k, v in self.query_context.form_data.to_dict().items(): print(k, ' -- ', v)
+            form_data = self.query_context.form_data
+            if form_data.datasource is None:
+                form_data.datasource = f'{self.datasource_id}__{self.datasource_type}'
+                breakpoint()

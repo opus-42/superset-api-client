@@ -17,7 +17,7 @@ def defult_metadata_position():
 
 @dataclass
 class Dashboard(Object):
-    JSON_FIELDS = []
+    JSON_FIELDS = ['json_metadata', 'position_json']
 
     dashboard_title: str
     published: bool = field(default=False)
@@ -25,12 +25,17 @@ class Dashboard(Object):
     css: str = default_string()
     slug: str = default_string()
 
-    json_metadata: dict = json_field()
-    position_json: dict = json_field()
-
-    metadata: Optional[Metadata] = field(default_factory=defult_metadata)
-    position: Optional[Metadataposition] = field(default_factory=defult_metadata_position)
+    json_metadata: Metadata = field(default_factory=defult_metadata)
+    position_json: Metadataposition = field(default_factory=defult_metadata_position)
     # charts: List[Chart] = field(default_factory=Chart)
+
+    @property
+    def metadata(self):
+        return self.json_metadata
+
+    @property
+    def position(self):
+        return self.position_json
 
     @property
     def colors(self) -> dict:
@@ -56,35 +61,35 @@ class Dashboard(Object):
             charts.append(c)
         return charts
 
-    @remove_fields_optional
-    def to_dict(self, columns=None):
-        data = super().to_dict(columns)
-        data['position_json'] = self.position.to_dict()
-        data['json_metadata'] = self.metadata.to_dict()
-        return data
+    # @remove_fields_optional
+    # def to_dict(self, columns=None):
+    #     data = super().to_dict(columns)
+    #     data['position_json'] = self.position.to_dict()
+    #     data['json_metadata'] = self.metadata.to_dict()
+    #     return data
 
-    @remove_fields_optional
-    def to_json(self, columns=None):
-        data = super().to_json(columns)
-        data['position_json'] = self.position.to_json()
-        data['json_metadata'] = self.metadata.to_json()
-        return data
+    # @remove_fields_optional
+    # def to_json(self, columns=None):
+    #     data = super().to_json(columns)
+    #     data['position_json'] = self.position.to_json()
+    #     data['json_metadata'] = self.metadata.to_json()
+    #     return data
 
-    @classmethod
-    def from_json(cls, data: dict):
-        data_result = data
-        if data.get('result'):
-            data_result = data['result']
-            obj = super().from_json(data_result)
-        else:
-            obj = super().from_json(data_result)
-
-        obj.metadata = Metadata.from_json(json.loads(data_result['json_metadata']))
-
-        obj.position = Metadata()
-        if data_result.get('position_json'):
-            obj.position = Metadataposition.from_json(json.loads(data_result['position_json']))
-        return obj
+    # @classmethod
+    # def from_json(cls, data: dict):
+    #     data_result = data
+    #     if data.get('result'):
+    #         data_result = data['result']
+    #         obj = super().from_json(data_result)
+    #     else:
+    #         obj = super().from_json(data_result)
+    #
+    #     obj.metadata = Metadata.from_json(json.loads(data_result['json_metadata']))
+    #
+    #     obj.position = Metadata()
+    #     if data_result.get('position_json'):
+    #         obj.position = Metadataposition.from_json(json.loads(data_result['position_json']))
+    #     return obj
 
 
 class Dashboards(ObjectFactories):
