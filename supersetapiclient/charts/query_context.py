@@ -3,14 +3,9 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 
 from supersetapiclient.base.base import Object
+from supersetapiclient.base.datasource import DataSource
 from supersetapiclient.charts.options import Option, PieOption
 from supersetapiclient.charts.queries import Querie
-from supersetapiclient.charts.types import DatasourceType
-
-@dataclass
-class DataSource(Object):
-    id: Optional[int] = None
-    type: DatasourceType = DatasourceType.TABLE
 
 
 @dataclass
@@ -29,11 +24,6 @@ class QueryContext(Object):
     form_data: FormData = field(default_factory=FormData)
     force: bool = field(default=False)
 
-
 @dataclass
 class PieQueryContext(QueryContext):
-    form_data: PieFormData = field(default_factory=FormData)
-
-    @classmethod
-    def get_default(cls):
-        breakpoint()
+    form_data: PieFormData = field(default_factory=PieFormData)

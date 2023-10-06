@@ -38,10 +38,10 @@ class Database(Object):
         return super().to_json(*args, **kwargs)
 
     def run(self, query, query_limit=None):
-        return self._parent.client.run(database_id=self.id, query=query, query_limit=query_limit)
+        return self._factory.client.run(database_id=self.id, query=query, query_limit=query_limit)
 
     def test_connection(self):
-        return self._parent.test_connection(self)
+        return self._factory.test_connection(self)
 
 
 class Databases(ObjectFactories):

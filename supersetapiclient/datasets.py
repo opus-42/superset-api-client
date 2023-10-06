@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from supersetapiclient.base.base import Object, ObjectFactories, QueryStringFilter
+from supersetapiclient.base.datasource import DataSource
 
 
 @dataclass
@@ -16,6 +17,7 @@ class Dataset(Object):
     description: str = ""
     kind: str = ""
     database_id: Optional[int] = None
+    datasource_type: str = ""
     sql: str = ""
 
     @classmethod
@@ -38,7 +40,7 @@ class Dataset(Object):
     def run(self, query_limit=None):
         if not self.sql:
             raise ValueError("Cannot run a dataset with no SQL")
-        return self._parent.client.run(database_id=self.database_id, query=self.sql, query_limit=query_limit)
+        return self._factory.client.run(database_id=self.database_id, query=self.sql, query_limit=query_limit)
 
 
 class Datasets(ObjectFactories):
@@ -48,8 +50,13 @@ class Datasets(ObjectFactories):
     # list of supported filters
     # http://localhost:8088/api/v1/dataset/_info?q=(keys:!(filters))
 
-    def get_id_by_name(self, name):
+    def get_datasource(self, name) -> DataSource:
         filter = QueryStringFilter()
         filter.add('table_name', 'eq', name)
-        obj = self.find_one(filter, ['id'])
-        return obj.id
+        response = self.client.find(self.base_url, filter, ['id', 'datasource_type'])
+        result = response['result'][0]
+        data = {
+            'id': result['id'],
+            'type': result['datasource_type']
+        }
+        return DataSource(**data)

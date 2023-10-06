@@ -1,12 +1,11 @@
 """Base classes."""
 import dataclasses
+import logging
 from enum import Enum
-
 from typing_extensions import Self
-
 from supersetapiclient.base.parse import ParseMixin
 from supersetapiclient.client import QueryStringFilter
-from supersetapiclient.utils import remove_fields_optional
+from supersetapiclient.typing import NotToJson
 
 try:
     from functools import cached_property
@@ -17,12 +16,12 @@ except ImportError:  # pragma: no cover
 import json
 import os.path
 from pathlib import Path
-from typing import List, Union, Dict, get_args, get_origin
+from typing import List, Union, Dict, get_args, get_origin, Any
 
 import yaml
 from requests import HTTPError
 
-from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound
+from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound, LoadJsonError
 
 
 def json_field(**kwargs):
@@ -30,7 +29,6 @@ def json_field(**kwargs):
         kwargs['default']=None
 
     return dataclasses.field(repr=False, **kwargs)
-
 
 def default_string(**kwargs):
     if not kwargs.get('default'):
@@ -60,10 +58,16 @@ def raise_for_status(response):
 
 
 class Object(ParseMixin):
-    _parent = None
+    _factory = None
     JSON_FIELDS = []
 
-    _extra_fields: Dict = dataclasses.field(default_factory=dict)
+    _extra_fields: Dict = {}
+
+    def __post_init__(self):
+        for f in self.JSON_FIELDS:
+            value = getattr(self, f) or "{}"
+            if isinstance(value, str):
+                setattr(self, f, json.loads(value))
 
     @classmethod
     def _get_type(cls, data):
@@ -125,48 +129,112 @@ class Object(ParseMixin):
         return extra_fields
 
     @classmethod
+    def _issubclass_object(cls, type_):
+        try:
+            if issubclass(type_, Object):
+                return True
+        except:
+            pass
+        return False
+
+    @classmethod
+    def _subclass_object(cls, field_name:str):
+        field = cls.get_field(field_name)
+        ObjectClass = field.type
+        type_ = None
+        while get_origin(ObjectClass):
+            if get_args(ObjectClass):
+                if len(get_args(ObjectClass)) == 2:
+                    type_, ObjectClass = get_args(ObjectClass)
+                else:
+                    ObjectClass = get_args(ObjectClass)[-1]
+            else:
+                break
+        if cls._issubclass_object(ObjectClass):
+            return type_, ObjectClass
+        return type_, None
+
+    @classmethod
     def from_json(cls, data: dict) -> Self:
         extra_fields = cls.__get_extra_fields(data)
-        obj = cls(**data)
+        field_name = None
+        data_value = None
+        try:
+            obj = cls(**data)
 
-        for field_name in cls.JSON_FIELDS:
-            data_value = data.get(field_name)
-            if isinstance(data_value, str):
-                field = cls.get_field(field_name)
-                if get_origin(field.type) is Union:
-                    ObjectClass = get_args(field.type)[0]
-                else:
-                    ObjectClass = field.type
-
-                if ObjectClass is Dict:
-                    value = json.loads(data_value)
-                else:
-                    value = ObjectClass.from_json(json.loads(data[field_name]))
-
-                setattr(obj, field_name, value)
-
-        for field_name, data_value in data.items():
-            if isinstance(data_value, dict):
-                field = cls.get_field(field_name)
-                ObjectClass = field.type
-                if not issubclass(ObjectClass, Dict):
-                    value = ObjectClass.from_json(data_value)
-                    setattr(obj, field_name, value)
-            elif isinstance(data_value, list):
-                instance_is_object = False
-                objects = []
-                for field_value in data_value:
-                    if isinstance(field_value, dict):
-                        instance_is_object = True
-                        field = cls.get_field(field_name)
+            for field_name in cls.JSON_FIELDS:
+                data_value = data.get(field_name)
+                if isinstance(data_value, str):
+                    field = cls.get_field(field_name)
+                    if get_origin(field.type) is Union:
                         ObjectClass = get_args(field.type)[0]
-                        value = ObjectClass.from_json(field_value)
-                        objects.append(value)
-                if instance_is_object:
-                    setattr(obj, field_name, objects)
+                    else:
+                        ObjectClass = field.type
 
-        obj._extra_fields = extra_fields
+                    if ObjectClass is Dict:
+                        value = json.loads(data_value)
+                    else:
+                        value = ObjectClass.from_json(json.loads(data[field_name]))
+                    setattr(obj, field_name, value)
+
+            for field_name, data_value in data.items():
+                if field_name in cls.JSON_FIELDS:
+                    continue
+                if isinstance(data_value, dict):
+                    type_, ObjectClass = cls._subclass_object(field_name)
+                    value = None
+                    if type_ and ObjectClass:
+                        value = {}
+                        for k, field_value in data_value.items():
+                            value[k] = ObjectClass.from_json(field_value)
+                    elif ObjectClass:
+                        value = ObjectClass.from_json(data_value)
+                    else:
+                        value = data_value
+                    setattr(obj, field_name, value)
+
+                elif isinstance(data_value, list):
+                    type_, ObjectClass = cls._subclass_object(field_name)
+                    if ObjectClass is None:
+                        value = data_value
+                    else:
+                        value = []
+                        for field_data_value in data_value:
+                            value.append(ObjectClass.from_json(field_data_value))
+                    setattr(obj, field_name, value)
+                else:
+                    setattr(obj, field_name, data_value)
+
+            obj._extra_fields = extra_fields
+        except Exception as err:
+            msg = f"""{err}
+                cls={cls}
+                field_name={field_name}
+                data_value={data_value}
+                cata={data}
+                extra_fields={extra_fields}
+            """
+            logging.error(msg)
+            raise LoadJsonError(err)
         return obj
+
+    def __remove_fields_NotToJson(self, data):
+        for field in self.fields():
+            try:
+                if get_origin(field.type) is NotToJson:
+                    try:
+                        data.pop(field.name)
+                    except KeyError:
+                        pass
+            except AttributeError:
+                pass
+        return data
+
+    def __remove_field_starting_shyphen(self, data):
+        fields = list(data.keys())
+        for field in fields:
+            if fields[0] == "_":
+                data.pop(field)
 
     def to_dict(self, columns=[]) -> dict:
         columns_names = set(columns or [])
@@ -179,27 +247,27 @@ class Object(ParseMixin):
             value = getattr(self, c)
             if isinstance(value, Enum):
                 value = str(value)
-            if isinstance(value, Object):
-                value = value.to_dict()
-            if isinstance(value, list):
+            elif isinstance(value, Object):
+                value = value.to_dict(columns)
+            elif isinstance(value, list):
                 instance_is_object = False
                 values_data = []
                 for obj in value:
                     if isinstance(obj, Object):
                         instance_is_object = True
-                        values_data.append(obj.to_dict())
+                        values_data.append(obj.to_dict(columns))
                 if instance_is_object:
                     value = values_data
+            if c=='chart_configuration' and isinstance(value, dict):
+                field = self.get_field(c)
+                if get_args(field.type) and issubclass(get_args(field.type)[-1], Object):
+                    _value = {}
+                    for k, obj in value.items():
+                        _value[k] =  obj.to_dict(columns)
+                    value = _value
             data[c] = value
         return data
 
-    def __remove_field_starting_shyphen(self, data):
-        fields = list(data.keys())
-        for field in fields:
-            if fields[0] == "_":
-                data.pop(field)
-
-    @remove_fields_optional
     def to_json(self, columns=[]) -> dict:
         data = self.to_dict(columns)
         for field in self.JSON_FIELDS:
@@ -211,29 +279,25 @@ class Object(ParseMixin):
 
         self.__remove_field_starting_shyphen(data)
 
+        self.__remove_fields_NotToJson(data)
+
         if data.get('extra_fields'):
             data.pop('extra_fields')
         return data
 
-    def __post_init__(self):
-        for f in self.JSON_FIELDS:
-            value = getattr(self, f) or "{}"
-            if isinstance(value, str):
-                setattr(self, f, json.loads(value))
-
     @property
     def base_url(self) -> str:
-        return self._parent.client.join_urls(self._parent.base_url, self.id)
+        return self._factory.client.join_urls(self._factory.base_url, self.id)
 
     def export(self, path: Union[Path, str]) -> None:
         """Export object to path"""
-        self._parent.export(ids=[self.id], path=path)
+        self._factory.export(ids=[self.id], path=path)
 
     def fetch(self) -> None:
         """Fetch additional object information."""
         field_names = self.field_names()
 
-        client = self._parent.client
+        client = self._factory.client
         response = client.get(self.base_url)
         o = response.json().get("result")
         for k, v in o.items():
@@ -245,17 +309,13 @@ class Object(ParseMixin):
 
     def save(self) -> None:
         """Save object information."""
-        o = self.to_json(columns=self._parent.edit_columns)
+        o = self.to_json(columns=self._factory.edit_columns)
 
-        print('>>> base.save ', self.base_url)
-        from pprint import pprint
-        pprint(o)
-
-        response = self._parent.client.put(self.base_url, json=o)
+        response = self._factory.client.put(self.base_url, json=o)
         raise_for_status(response)
 
     def delete(self) -> bool:
-        return self._parent.delete(id=self.id)
+        return self._factory.delete(id=self.id)
 
 
 class ObjectFactories:
@@ -327,7 +387,7 @@ class ObjectFactories:
         BaseClass = self.get_base_object(data_result)
         object = BaseClass.from_json(data_result)
 
-        object._parent = self
+        object._factory = self
 
         return object
 
@@ -339,7 +399,7 @@ class ObjectFactories:
         objects = []
         for data in response.get("result"):
             o = self.get_base_object(data).from_json(data)
-            o._parent = self
+            o._factory = self
             objects.append(o)
 
         return objects
@@ -364,14 +424,10 @@ class ObjectFactories:
 
         o = obj.to_json(columns=self.add_columns)
 
-        print('\n>>> base.add ', self.base_url)
-        from pprint import pprint
-        pprint(o)
-
         response = self.client.post(self.base_url, json=o)
         raise_for_status(response)
         obj.id = response.json().get("id")
-        obj._parent = self
+        obj._factory = self
         return obj.id
 
     def export(self, ids: List[int], path: Union[Path, str]) -> None:

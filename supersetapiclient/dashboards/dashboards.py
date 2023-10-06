@@ -3,9 +3,12 @@ import json
 from dataclasses import dataclass, field
 from typing import List, Optional
 from supersetapiclient.base.base import Object, ObjectFactories, default_string, json_field
+from supersetapiclient.dashboards.itemposition import ItemPosition
 from supersetapiclient.dashboards.metadata import Metadata
 from supersetapiclient.dashboards.metadataposition import Metadataposition
-from supersetapiclient.utils import remove_fields_optional
+from supersetapiclient.dashboards.nodeposisition import RowNodePosition
+from supersetapiclient.exceptions import DashboardValidationError
+from supersetapiclient.typing import NotToJson
 
 
 def defult_metadata():
@@ -21,12 +24,12 @@ class Dashboard(Object):
 
     dashboard_title: str
     published: bool = field(default=False)
-    id: Optional[int] = None
+    id: NotToJson[int] = None
     css: str = default_string()
-    slug: str = default_string()
+    slug: str = None
 
-    json_metadata: Metadata = field(default_factory=defult_metadata)
-    position_json: Metadataposition = field(default_factory=defult_metadata_position)
+    json_metadata: Metadata = field(default_factory=Metadata)
+    position_json: Metadataposition = field(default_factory=Metadataposition)
     # charts: List[Chart] = field(default_factory=Chart)
 
     @property
@@ -36,6 +39,29 @@ class Dashboard(Object):
     @property
     def position(self):
         return self.position_json
+
+    def add_chart(self, chart, title:str, parent: ItemPosition=None):
+        chart.add_dashboard(self)
+        if not self.id:
+            raise DashboardValidationError('To add charts, first save the dashboard. Do this by calling the client.dashboards.add([this-dashboard]) method.')
+        if not chart.id:
+            self._factory.client.charts.add(chart, title, update_dashboard=False)
+
+        self._factory.client.charts.add_to_dashboard(chart, self.id)
+
+        self.metadata.add_chart(chart)
+
+        node_position = parent
+        if node_position is None:
+            if not node_position:
+                grid = self.position.tree.grid
+                node_position = grid
+                if grid.children:
+                    node_position = grid.children[-1]
+                if not isinstance(node_position, RowNodePosition):
+                    node_position = grid
+        self.position.add_chart(chart, title, node_position)
+
 
     @property
     def colors(self) -> dict:
@@ -55,44 +81,18 @@ class Dashboard(Object):
 
     def get_charts(self) -> List[int]:
         """Get chart objects"""
+        #http://localhost:8088/api/v1/dashboard/21/charts
         charts = []
         for slice_name in self.charts:
-            c = self._parent.client.charts.find_one(slice_name=slice_name)
+            c = self._factory.client.charts.find_one(slice_name=slice_name)
             charts.append(c)
         return charts
 
-    # @remove_fields_optional
-    # def to_dict(self, columns=None):
-    #     data = super().to_dict(columns)
-    #     data['position_json'] = self.position.to_dict()
-    #     data['json_metadata'] = self.metadata.to_dict()
-    #     return data
-
-    # @remove_fields_optional
-    # def to_json(self, columns=None):
-    #     data = super().to_json(columns)
-    #     data['position_json'] = self.position.to_json()
-    #     data['json_metadata'] = self.metadata.to_json()
-    #     return data
-
-    # @classmethod
-    # def from_json(cls, data: dict):
-    #     data_result = data
-    #     if data.get('result'):
-    #         data_result = data['result']
-    #         obj = super().from_json(data_result)
-    #     else:
-    #         obj = super().from_json(data_result)
-    #
-    #     obj.metadata = Metadata.from_json(json.loads(data_result['json_metadata']))
-    #
-    #     obj.position = Metadata()
-    #     if data_result.get('position_json'):
-    #         obj.position = Metadataposition.from_json(json.loads(data_result['position_json']))
-    #     return obj
+    def get_datasets(self):
+        pass
+        #http://localhost:8088/api/v1/dashboard/21/datasets
 
 
 class Dashboards(ObjectFactories):
     endpoint = "dashboard/"
     base_object = Dashboard
-

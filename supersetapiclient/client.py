@@ -246,7 +246,6 @@ class SupersetClient:
 
     def find(self, url, filter:QueryStringFilter, columns:List[str]=[], page_size: int = 100, page: int = 0):
         """Find and get objects from api."""
-
         query = {
             "page_size": page_size,
             "page": page,

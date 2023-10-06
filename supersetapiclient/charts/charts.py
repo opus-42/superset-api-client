@@ -2,21 +2,22 @@
 import copy
 import json
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 from typing_extensions import Self
 
 from supersetapiclient.base.base import Object, ObjectFactories, default_string, raise_for_status, json_field
+from supersetapiclient.base.types import DatasourceType
 from supersetapiclient.charts.filters import AdhocFilterClause
 from supersetapiclient.charts.options import Option, PieOption
-from supersetapiclient.charts.queries import QueryFilterClause
+from supersetapiclient.charts.queries import QueryFilterClause, Querie
 
-from supersetapiclient.charts.query_context import QueryContext, PieQueryContext
-from supersetapiclient.charts.types import ChartType, FilterOperationType, FilterClausesType, FilterExpressionType, \
-    DatasourceType
-from supersetapiclient.dashboards.itemposition import Position, ItemPosition
-from supersetapiclient.dashboards.nodeposisition import RowNodePosition
+from supersetapiclient.charts.query_context import QueryContext, PieQueryContext, DataSource
+from supersetapiclient.charts.types import ChartType, FilterOperatorType, FilterClausesType, FilterExpressionType, \
+    LabelType, LegendOrientationType, NumberFormatType, LegendType
+from supersetapiclient.dashboards.dashboards import Dashboard
+from supersetapiclient.dashboards.itemposition import ItemPosition
 from supersetapiclient.exceptions import NotFound, ChartValidationError
-from supersetapiclient.utils import remove_fields_optional
+from supersetapiclient.typing import NotToJson
 
 
 @dataclass
@@ -24,113 +25,61 @@ class Chart(Object):
     JSON_FIELDS = ['params', 'query_context']
 
     slice_name: str
+    datasource_id: int = None
+    description: str = None
 
     viz_type: ChartType = None
-    # _dashboards: List[Dashboard] = field(default_factory=list, init=False, repr=False)
 
     #For post charts, optional fields are not used.
-    id: Optional[int] = None
-    description: str = default_string()
+    id: NotToJson[int] = None
 
-    slice_name_override: Optional[str] = default_string()
-    show_title: Optional[str] = default_string(default="Show Slice")
-    cache_timeout: Optional[int] = field(default=None)
-    result_format: Optional[str] = field(default='json')
-    result_type: Optional[str] = field(default='full')
+    cache_timeout: NotToJson[int] = field(default=None)
+    result_format: NotToJson[str] = field(default='json')
+    result_type: NotToJson[str] = field(default='full')
 
-    params: Optional[Option] = field(default_factory=Option)
-    query_context: Optional[QueryContext] = field(default_factory=QueryContext)
+    params: Option = field(default_factory=Option)
+    query_context: QueryContext = field(default_factory=QueryContext)
 
-    datasource_id: str = field(default=None)
     datasource_type: DatasourceType = DatasourceType.TABLE
+    dashboards: List[Dashboard] = field(default_factory=list)
+
+    _slice_name_override: NotToJson[str] = default_string()
 
     def __post_init__(self):
         from supersetapiclient.dashboards.dashboards import Dashboard
-        self._dashboards = Dashboard(dashboard_title='')
+        self._dashboards = [Dashboard(dashboard_title='')]
 
-        if self.id is None and self.datasource_id is None:
-            raise ChartValidationError("""
-                When id is None, argument datasource id becomes mandatory. 
-                We recommend using the [client_superset].datasets.get_id_by_name('name_dataset') method 
-                to get the dataset id by name.
-            """)
+        if self.id is None:
+            if self.datasource_id is None:
+                raise ChartValidationError("""
+                    When id is None, argument datasource id becomes mandatory. 
+                    We recommend using the [client_superset].datasets.get_id_by_name('name_dataset') method 
+                    to get the dataset id by name.
+                """)
+
+            if self.params.datasource is None:
+                self.query_context.datasource.id = self.datasource_id
+                self.params.datasource = f'{self.datasource_id}__{self.datasource_type}'
+                self.query_context.form_data = self.params.datasource
 
     @classmethod
     def _get_type(self, data):
         return data['viz_type']
 
-    @property
-    def dashboard(self):
-        if self._dashboards:
-            return self._dashboards[0]
-        return None
+    def add_dashboard(self, dashboard):
+        self.dashboards.append(dashboard)
 
-    @property
-    def dashboards(self):
-        return self._dashboards
-
-    def get_show_columns(self, prefix=None) -> list:
-        if prefix is None:
-            return self._extra_fields.get('show_columns', [])
-        columns = []
-        for column_name in self._extra_fields.get('show_columns', []):
-            if prefix in column_name:
-                columns.append(column_name.split('.')[-1])
-        return columns
-
-    @property
-    def label_columns(self, prefix=None) -> dict:
-        if prefix is None:
-            return self._extra_fields.get('label_columns', {})
-
-    @property
-    def description_columns(self, prefix=None) -> dict:
-        if prefix is None:
-            return self._extra_fields.get('description_columns', {})
-
-    def clone(self, slice_name:str = None, slice_name_override:str = None, clear_filter:bool = True) -> Self:
+    def clone(self, slice_name:str = None, slice_name_override:str = None,  clear_dashboard:bool = False, clear_filter:bool = True) -> Self:
         new_chart = copy.deepcopy(self)
         new_chart.slice_name = slice_name or f'{new_chart.slice_name}_clone'
-        new_chart.slice_name_override = slice_name_override or f'Chart clone de {new_chart.slice_name}'
+        new_chart._slice_name_override = slice_name_override or f'Chart clone de {new_chart.slice_name}'
         new_chart.id = 0
 
+        if clear_dashboard:
+            new_chart.dashboards = []
         if clear_filter:
             new_chart.clear_filter()
 
-        # Observações sobre clonagem de gráfico
-        # Se houver alteração nas configurações do gráfico, deve-se
-        # - inluir um novo item em chart_configuration
-        # - chartsInScope deve apontar para o id do chart original
-        # - incluir um novo item em global_chart_configuration.chartsInScope
-        # Se houver alterações na fonte de dados, deve-se:
-        # - definir params.slice_id = novo id
-        # - definir params.query_context.form_data.slice_id = novo id
-        # Se a fonte de dados permanecer a mesma, deve-se
-        # - manter self.params
-        # - manter self.query_context
-
-
-        # Observação sobre criação de novo gráfico
-        # Ao criar um novo gráfico, sem está associado a um dashboard, deve-se
-        # - Definir "slice_name": "aai_20231_19_899",
-        # - Definir  "viz_type": "pie",
-        # - Definir "datasource_id": 24,
-        # - Definir "datasource_type": "table",
-        # - Definir self.query_context
-        # - Definir self.params
-        # - Definir self.dashboards = []
-        # - Remover self.id
-        # - Remover self.params.slice_ide
-        # - Remover self.dashboards = {}
-        # - Remover self.label_columns
-        # - remover self.description_columns
-        # - remover self.show_title
-        # - remover sel.tags
-        # - remover self.thumbnail_url
-        # - remover self.url
-        # - remover self.viz_type
-        # - remover self.cache_timeout
-        # - remover self.show_columns
         return new_chart
 
     def clear_filter(self) -> None:
@@ -141,9 +90,9 @@ class Chart(Object):
         self.query_context.form_data.adhoc_filters = []
 
     def add_simple_filter(self, column_name:str,
-                   value: str,
-                   operator:FilterOperationType = FilterOperationType.EQUAL,
-                   clause:FilterClausesType = FilterClausesType.WHERE) -> None:
+                          value: str,
+                          operator:FilterOperatorType = FilterOperatorType.EQUAL,
+                          clause:FilterClausesType = FilterClausesType.WHERE) -> None:
 
         if not self.query_context.queries:
             raise ChartValidationError("""The queries list is empty. 
@@ -162,32 +111,23 @@ class Chart(Object):
         self.params.adhoc_filters.append(adhoc_filter_clause)
         self.query_context.form_data.adhoc_filters.append(adhoc_filter_clause)
 
+        self.params.adhoc_filters == self.query_context.form_data.adhoc_filters
         query_filter_clause = QueryFilterClause(col=column_name, val=value, op=operator)
         self.query_context.queries[0].filters.append(query_filter_clause)
 
-    # def to_dict(self, columns=None):
-    #     data = super().to_dict(columns)
-    #     if data.get('id'):
-    #         data['id'] = data['id']
-    #
-    #     return data
 
-    # @remove_fields_optional
     def to_json(self, columns=None):
-        data = super().to_json(columns)
-        data['dashboards'] = self.params.dashboards
+        data = super().to_json(columns).copy()
+        dashboards = set()
+        for dasboard in self.dashboards:
+            dashboards.add(dasboard.id)
+        data['dashboards'] = list(dashboards)
         return data
 
     @classmethod
     def from_json(cls, data: dict):
-        from supersetapiclient.dashboards.dashboards import Dashboard
-
         obj = super().from_json(data)
-
-        dashboards = []
-        for dashboard in obj.extra_fields.get('dashboards', []):
-            dashboards.append(Dashboard.from_json(dashboard))
-        obj._dashboards = dashboards
+        obj._dashboards = obj.dashboards
 
         #set default datasource
         datasource = obj.query_context.datasource
@@ -236,27 +176,32 @@ class Charts(ObjectFactories):
         raise_for_status(response)
         return response.json().result('result')
 
-    def add(self, chart, parent: ItemPosition = None) -> int:
+    def add(self, chart:Chart, title:str, parent: ItemPosition = None, update_dashboard=True) -> int:
         id = super().add(chart)
-        chart.id = id
 
-        if chart.dashboard:
-            dashboard = self.client.dashboards.get(chart.dashboard.id)
-
-            node_position = parent
-            if not node_position:
-                grid = dashboard.position.tree.grid
-                node_position = grid.children[-1]
-                if not isinstance(node_position, RowNodePosition):
-                    node_position = grid
-            # from pprint import pprint
-            # pprint(dashboard.to_dict())
-            # breakpoint()
-            dashboard.position.add_chart(chart, node_position)
-            dashboard.save()
-
-
+        try:
+            if update_dashboard and chart.dashboards:
+                dashboard_id = chart.dashboards[0].id
+                dashboard = self.client.dashboards.get(dashboard_id)
+                dashboard.add_chart(chart, title)
+                dashboard.save()
+        except:
+            self.delete(id)
+            raise
         return id
+
+    def add_to_dashboard(self, chart:Chart, dashboard_id=int):
+        url = self.client.join_urls(self.base_url, "/data")
+        query = {
+            'slice_id': chart.id,
+            'dashboard_id': dashboard_id,
+            'force': None
+        }
+        params = {"form_data": json.dumps(query)}
+        payload = chart.query_context.to_dict()
+        response = self.client.post(url, params=params, json=payload)
+        raise_for_status(response)
+        return response.json()
 
 
 @dataclass
@@ -265,11 +210,28 @@ class PieChart(Chart):
     params: PieOption = field(default_factory=PieOption)
     query_context: PieQueryContext = field(default_factory=PieQueryContext)
 
-    def __post_init__(self):
-        super().__post_init__()
-        if self.id is None:
-            for k, v in self.query_context.form_data.to_dict().items(): print(k, ' -- ', v)
-            form_data = self.query_context.form_data
-            if form_data.datasource is None:
-                form_data.datasource = f'{self.datasource_id}__{self.datasource_type}'
-                breakpoint()
+
+    #GET http://localhost:8088/superset/fetch_datasource_metadata?datasourceKey=24__table
+    @classmethod
+    def instance(cls,
+                 slice_name:str,
+                 datasource: DataSource,
+                 groupby: list[str],
+                 options: PieOption = Option()):
+
+        new_chart = cls(slice_name=slice_name,
+                   datasource_id   = datasource.id,
+                   datasource_type = datasource.type)
+
+        options.datasource = f'{datasource.id}__{datasource.type}'
+        options.groupby= groupby
+
+        query = Querie(columns=groupby)
+        new_chart.query_context.queries.append(query)
+
+        new_chart.params = options
+        new_chart.query_context.form_data = copy.deepcopy(options)
+
+        # breakpoint()
+
+        return new_chart

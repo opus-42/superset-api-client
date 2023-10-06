@@ -78,7 +78,7 @@ class LabelType(StringEnum):
     CATEGORI_VALUE_AND_PERCENTAG = 'key_value_percent'
 
 
-class FilterOperationType(StringEnum):
+class FilterOperatorType(StringEnum):
     EQUAL = '=='
     NOT_EQUAL = '!='
     LESS_THAN = '<'
@@ -97,6 +97,23 @@ class FilterOperationType(StringEnum):
     TEMPORAL_RANGE = 'TEMPORAL_RANGE'
 
 
+class FilterStringOperatorsType(StringEnum):
+    EQUALS = ("EQUALS",)
+    NOT_EQUALS = ("NOT_EQUALS",)
+    LESS_THAN = ("LESS_THAN",)
+    GREATER_THAN = ("GREATER_THAN",)
+    LESS_THAN_OR_EQUAL = ("LESS_THAN_OR_EQUAL",)
+    GREATER_THAN_OR_EQUAL = ("GREATER_THAN_OR_EQUAL",)
+    IN = ("IN",)
+    NOT_IN = ("NOT_IN",)
+    ILIKE = ("ILIKE",)
+    LIKE = ("LIKE",)
+    IS_NOT_NULL = ("IS_NOT_NULL",)
+    IS_NULL = ("IS_NULL",)
+    LATEST_PARTITION = ("LATEST_PARTITION",)
+    IS_TRUE = ("IS_TRUE",)
+    IS_FALSE = ("IS_FALSE",)
+
 class FilterExpressionType(StringEnum):
     SIMPLE = 'SIMPLE'
     CUSTOM_CQL = 'SQL'
@@ -105,16 +122,6 @@ class FilterExpressionType(StringEnum):
 class FilterClausesType(StringEnum):
   HAVING = 'HAVING'
   WHERE = 'WHERE'
-
-
-class DatasourceType(StringEnum):
-    SLTABLE = "sl_table"
-    TABLE = "table"
-    DATASET = "dataset"
-    QUERY = "query"
-    SAVEDQUERY = "saved_query"
-    VIEW = "view"
-
 
 class CurrencyCodeType(StringEnum):
     AED = 'AED'

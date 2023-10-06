@@ -1,28 +1,19 @@
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, fields, asdict, MISSING
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 from supersetapiclient.base.base import Object, default_string
 from supersetapiclient.charts.filters import AdhocFilterClause
 from supersetapiclient.charts.types import ChartType, LabelType, LegendOrientationType, LegendType, DateFormatType, \
     NumberFormatType, CurrentPositionType, CurrencyCodeType
+from supersetapiclient.exceptions import ChartValidationError
 
-D3_TIME_FORMAT_OPTIONS = [
-  ['smart_date', '%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d', '%Y-%m-%d %H:%M:%S', '%d-%m-%Y %H:%M:%S', '%H:%M:%S']
-]
-# D3_FORMAT_DOCS,
-# D3_NUMBER_FORMAT_DESCRIPTION_VALUES_TEXT,
-# D3_FORMAT_OPTIONS,
-# D3_TIME_FORMAT_OPTIONS,
+
 @dataclass
 class CurrencyFormat(Object):
     symbolPosition: CurrentPositionType = None
     symbol: CurrencyCodeType = None
-
-    # @classmethod
-    # def from_json(cls, data: dict):
-    #     return super().from_json(data)
 
 
 @dataclass
@@ -30,36 +21,66 @@ class Option(Object):
     viz_type: ChartType = None
     slice_id: Optional[int] = None
 
-    datasource: str = field(default=None)
+    datasource: str = None
 
     color_scheme: str = default_string(default='supersetColors')
-    legendMargin: int = field(default=0)
-    show_total: bool = field(default=False)
-    show_labels: bool = field(default=True)
-    show_legend: bool = field(default=True)
-    metric: str = default_string(default='count')
-    row_limit: int = field(default=100)
-    sort_by_metric: bool = field(default=True)
+    legendType: LegendType = LegendType.SCROLL
+    legendOrientation: LegendOrientationType = LegendOrientationType.TOP
+    show_legend: bool = True
+    show_labels: bool = True
+    legendMargin: int = None
     currency_format: CurrencyFormat = field(default_factory=CurrencyFormat)
-    number_format: NumberFormatType = NumberFormatType.ORIGINAL_VALUE
+    number_format: NumberFormatType = NumberFormatType.SMART_NUMBER
     date_format: DateFormatType = DateFormatType.SMART_DATE
 
     adhoc_filters: List[AdhocFilterClause] = field(default_factory=list)
-
-    dashboards: List[int] = field(default_factory=list)
+    # dashboards: List[int] = field(default_factory=list)
     groupby: List[str] = field(default_factory=list)
 
 
 @dataclass
 class PieOption(Option):
     viz_type: ChartType = ChartType.PIE
-    donut: bool = field(default=False)
-    innerRadius: int = field(default=30)
-    label_line: bool = field(default=True)
-    label_type: LabelType = LabelType.CATEGORI_VALUE_AND_PERCENTAG
-    legendOrientation: LegendOrientationType = LegendOrientationType.BOTTOM
-    legendType: LegendType = LegendType.PLAIN
+    label_type: LabelType = LabelType.CATEGORY_NAME
+    metric: str = 'count'
+    donut: bool = False
+    label_line: bool = False
+    labels_outside: bool = True
+    show_total: bool = False
+    sort_by_metric: bool = True
+    innerRadius: int = 30
+    outerRadius: int = 70
+    show_labels_threshold: int = 3
+    row_limit: int = 100
 
-    labels_outside: bool = field(default=True)
-    outerRadius: int = field(default=70)
-    show_labels_threshold: int = field(default=5)
+    def __post_init__(self):
+        if self.donut and self.innerRadius != 30:
+            self.donut = True
+        if self.legendMargin:
+            self.show_legend = True
+        if self.label_line:
+            self.labels_outside = True
+            self.show_labels = True
+        if self.labels_outside:
+            self.show_labels = True
+
+
+# 'metric': {'aggregate': 'SUM',
+#            'column': {'column_name': 'sales',
+#                       'description': None,
+#                       'expression': None,
+#                       'filterable': True,
+#                       'groupby': True,
+#                       'id': 917,
+#                       'is_dttm': False,
+#                       'optionName': '_col_Sales',
+#                       'python_date_format': None,
+#                       'type': 'DOUBLE '
+#                               'PRECISION',
+#                       'verbose_name': None},
+#            'expressionType': 'SIMPLE',
+#            'hasCustomLabel': False,
+#            'isNew': False,
+#            'label': '(Sales)',
+#            'optionName': 'metric_3sk6pfj3m7i_64h77bs4sly',
+#            'sqlExpression': None},

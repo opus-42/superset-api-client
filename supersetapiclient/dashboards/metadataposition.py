@@ -2,7 +2,6 @@ import json
 from dataclasses import dataclass
 
 from supersetapiclient.base.base import Object
-from supersetapiclient.charts.charts import Chart
 from supersetapiclient.dashboards.itemposition import TabItemPosition, MarkdownItemPosition, ItemPosition, \
     ChartItemPosition
 from supersetapiclient.dashboards.nodeposisition import MarkdownNodePosition, TabNodePosition, NodePosition, \
@@ -21,14 +20,11 @@ class Metadataposition(Object):
     def tree(self):
         return self._tree
 
-    def to_dict(self, columns=None):
-        # data = super().to_dict(self.field_names())
-        data = super().to_dict()
+    def to_dict(self, columns=[]) -> dict:
+        data = super().to_dict(columns)
         data.update(self.tree.to_dict())
         return data
 
-    # def to_json(self, columns=None):
-    #     return json.dumps(self.to_dict())
 
     @classmethod
     def from_json(cls, data: dict):
@@ -53,12 +49,12 @@ class Metadataposition(Object):
     def add(self, item: ItemPosition, parent: ItemPosition) -> NodePosition:
         return self.tree.insert(item, parent)
 
-    def add_chart(self, chart:Chart, parent: ItemPosition = None, height: int = 50, width: int = 4, relocate:bool = True) -> ChartNodePosition:
+    def add_chart(self, chart, title:str, parent: ItemPosition = None, height: int = 50, width: int = 4, relocate:bool = True) -> ChartNodePosition:
         if not parent:
             parent = self.tree.grid
         return self.tree.insert(ChartItemPosition(chartId=chart.id,
                                                   sliceName=chart.slice_name,
-                                                  sliceNameOverride=chart.slice_name_override,
+                                                  sliceNameOverride=title,
                                                   height=height,
                                                   width=width,
                                                   relocate=relocate), parent)

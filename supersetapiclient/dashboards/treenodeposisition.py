@@ -30,7 +30,6 @@ class TreeNodePosition:
         return node
 
     def print(self):
-        # print(RenderTree(self.root, style=AsciiStyle()).by_attr())
         for pre, fill, node in RenderTree(self.root):
             print(f"{pre}{node.item}")
 

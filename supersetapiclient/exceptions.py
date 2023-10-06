@@ -1,8 +1,8 @@
 """Custom Exception."""
 import json
+import traceback
 
 from requests import HTTPError
-
 
 class NotFound(Exception):
     pass
@@ -43,9 +43,16 @@ class AcceptChildError(Exception):
         super().__init__(message)
 
 
+class LoadJsonError(Exception):
+    pass
+
+
 class NodePositionValidationError(Exception):
     pass
 
+
+class DashboardValidationError(Exception):
+    pass
 
 class ChartValidationError(Exception):
     pass

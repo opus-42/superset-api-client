@@ -195,25 +195,82 @@ class CheckFreeSpaceMixin:
     def __init__(self, item: MarkdownItemPosition, parent: Self = None):
         self._validate(item)
 
-        if parent and parent.type_ != ItemPositionType.ROW:
-            parent = self._insert_parent(RowItemPosition(), parent, RowNodePosition)
-
         parent = self._get_next_row_free(item, parent)
+
+        # if parent and parent.type_ != ItemPositionType.ROW:
+        #     parent = self._insert_parent(RowItemPosition(), parent, RowNodePosition)
+
         super().__init__(item, parent)
 
 
-    def _get_next_row_free(self, item, row_parent):
-        free_space, total_width = self.have_free_space(row_parent, item)
-        if not free_space and item.relocate:
-            return self.get_new_node_position(RowItemPosition(), row_parent.parent)
-        return row_parent
+    def _get_next_row_free(self, item, parent):
+        """
+            Se parent não existir gere uma exceção.
+
+            # Tratamento quando item.relocate = False
+            Se não permite  permite realocação (item.relocate),
+            checa se parent é uma row, se sim, verifica se há espaço,
+            caso contrário, dispare a exceção.
+
+            Se parente for um TAB, crie uma nova row.
+
+            # Tratamento quando item.relocate = True
+            Checa se parent é uma row, se sim, verifica se há espaço
+            para incluir o item.
+
+            Se a row estiver com espaço lotado, verifica se há rows irmãos livre,
+            se sim, inclui o item, caso contrário, cria uma nova row.
+
+            Se parent for um TAB, busca em todos os filhos do tipo ROW se há espaço
+            para incluir o item. Se não encontrar, crua uma nova row.
+
+        :param item:
+        :param parent:
+        :return:
+        """
+
+        if parent:
+            if parent.type_ == ItemPositionType.ROW:
+                free_space, total_width = self.have_free_space(parent, item)
+                if free_space:
+                    return parent
+
+                if not item.relocate:
+                    raise NodePositionValidationError(
+                        f'There is not enough space for this component. Total {total_width} exceeds the maximum allowable width of {ItemPosition.MAX_WIDTH}.')
+
+                # Row está cheio.
+                # Busca se existe algum irmão com espaço
+                if parent.sibling:
+                    for node_irmao in parent.sibling:
+                        free_space, total_width = self.have_free_space(node_irmao, item)
+                        if free_space:
+                            return node_irmao
+
+                # Não foi encontrado rows com espaço, então cria uma nova.
+                return self.get_new_node_position(RowItemPosition(), parent.parent)
+            elif parent.type_ == ItemPositionType.TAB:
+                if parent.children:
+                    for child in parent.children:
+                        free_space, total_width = self.have_free_space(child, item)
+                        if free_space:
+                            return child
+
+                    if not item.relocate:
+                        raise NodePositionValidationError(
+                            f'There is not enough space for this component. Total {total_width} exceeds the maximum allowable width of {ItemPosition.MAX_WIDTH}.')
+
+                # Aba não possui rows disponíveis, retornando uma nova
+                return self.get_new_node_position(RowItemPosition(), parent)
+            else:
+                 raise NodePositionValidationError(f'Item {item.id} não pode ser inserindo no nó do tipo {parent.type_}. Inclua-o em um nó do tipo TAB ou ROW.')
 
     @classmethod
-    def have_free_space(cls, node, item):
+    def have_free_space(cls, row_node, item):
         total_width = item.width
-        for child in node.children:
+        for child in row_node.children:
             total_width += child.item.width
-        if total_width <= MarkdownItemPosition.MAX_WIDTH:
+        if total_width <= ItemPosition.MAX_WIDTH:
             return True, total_width
         return False, total_width
 
@@ -224,7 +281,7 @@ class CheckFreeSpaceMixin:
         total_width = item.width
         for node_sibling in self.siblings:
             total_width += node_sibling.item.width
-        if total_width > MarkdownItemPosition.MAX_WIDTH and not item.relocate:
+        if total_width > ItemPosition.MAX_WIDTH and not item.relocate:
             raise NodePositionValidationError(
                 f'There is not enough space for this component. Total {total_width} exceeds the maximum allowable width of {MarkdownItemPosition.MAX_WIDTH}')
 

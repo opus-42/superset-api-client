@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 from supersetapiclient.base.base import Object, default_string
-from supersetapiclient.charts.types import FilterOperationType
+from supersetapiclient.charts.types import FilterOperatorType
+from supersetapiclient.typing import FilterValues
 
 
 @dataclass
@@ -14,8 +15,8 @@ class QuerieExtra(Object):
 @dataclass
 class QueryFilterClause(Object):
     col: str
-    val: str
-    op: FilterOperationType = FilterOperationType.EQUAL
+    val: Optional[FilterValues]
+    op: FilterOperatorType = FilterOperatorType.EQUAL
 
 
 @dataclass
@@ -24,6 +25,10 @@ class Querie(Object):
     extras: QuerieExtra = field(default_factory=QuerieExtra)
     columns: List[str] = field(default_factory=list)
     metrics: List[str] = field(default_factory=list)
-    row_limit: int = field(default=100)
-    series_limit: int = field(default=0)
-    order_desc: bool = field(default=True)
+    row_limit: int = 100
+    series_limit: int = 0
+    order_desc: bool = True
+
+    def __post_init__(self):
+        if not self.metrics:
+            self.metrics = ['count']

@@ -211,6 +211,11 @@ class DividerItemPosition(ItemPosition):
 class ChartItemPosition(RelocateMixin, ItemPosition):
     ACCEPT_CHILD = False
     def __init__(self, chartId: int, sliceName: str, sliceNameOverride: str = None, height: int = 50, width: int = 4, uuid: str = None, relocate:bool = True, **kwargs):
+        if not chartId:
+            raise NodePositionValidationError('chartId argument cannot be null or empty')
+        if not sliceName:
+            raise NodePositionValidationError('sliceName argument cannot be null or empty')
+
         _meta = {
             'chartId': chartId,
             'sliceName': sliceName,
