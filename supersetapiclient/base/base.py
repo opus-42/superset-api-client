@@ -1,6 +1,7 @@
 """Base classes."""
 import dataclasses
 import logging
+from abc import abstractmethod
 from enum import Enum
 from typing_extensions import Self
 from supersetapiclient.base.parse import ParseMixin
@@ -21,7 +22,15 @@ from typing import List, Union, Dict, get_args, get_origin, Any
 import yaml
 from requests import HTTPError
 
-from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound, LoadJsonError
+from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound, \
+    LoadJsonError, ValidationError
+
+
+class ObjectDecoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Enum):
+            return str(obj.value)  # Converte o Enum para seu valor (string)
+        return super(self).default(obj)
 
 
 def json_field(**kwargs):
@@ -69,9 +78,10 @@ class Object(ParseMixin):
             if isinstance(value, str):
                 setattr(self, f, json.loads(value))
 
-    @classmethod
-    def _get_type(cls, data):
-        return None
+    @abstractmethod
+    def validate(self, data: dict):
+        pass
+
 
     @property
     def extra_fields(self):
@@ -247,7 +257,7 @@ class Object(ParseMixin):
             value = getattr(self, c)
             if isinstance(value, Enum):
                 value = str(value)
-            elif isinstance(value, Object):
+            if isinstance(value, Object):
                 value = value.to_dict(columns)
             elif isinstance(value, list):
                 instance_is_object = False
@@ -270,12 +280,15 @@ class Object(ParseMixin):
 
     def to_json(self, columns=[]) -> dict:
         data = self.to_dict(columns)
+        print('>>>>', data)
+        self.validate(data)
+
         for field in self.JSON_FIELDS:
             obj = getattr(self, field)
             if isinstance(obj, Object):
-                data[field] = json.dumps(obj.to_json())
+                data[field] = json.dumps(obj.to_json(), cls=ObjectDecoder)
             elif isinstance(obj, dict):
-                data[field] = json.dumps(data[field])
+                data[field] = json.dumps(data[field], cls=ObjectDecoder)
 
         self.__remove_field_starting_shyphen(data)
 
@@ -311,7 +324,14 @@ class Object(ParseMixin):
         """Save object information."""
         o = self.to_json(columns=self._factory.edit_columns)
 
+        print('\n>>>>>>>>>>>>>>>>>>> base.save - payload:')
+        print(o)
+
         response = self._factory.client.put(self.base_url, json=o)
+
+        print('\n>>>>>>>>>>>>>>>>>>> base.save - response:')
+        print(response.json())
+
         raise_for_status(response)
 
     def delete(self) -> bool:
@@ -333,12 +353,9 @@ class ObjectFactories:
         """
         self.client = client
 
-    @classmethod
-    def get_base_object(cls, data):
-        type_ = cls.base_object._get_type(data)
-        if type_:
-            return cls.base_object.get_class(type_)
-        return cls.base_object
+    @abstractmethod
+    def get_base_object(self, data):
+        raise NotImplemented()
 
     @cached_property
     def _infos(self):
@@ -387,6 +404,13 @@ class ObjectFactories:
         BaseClass = self.get_base_object(data_result)
         object = BaseClass.from_json(data_result)
 
+        print('\n>>>>>>>>>>>>>>>>>>> base.get - response:')
+        jdict = response.json()
+        for field_name in object.JSON_FIELDS:
+            jdict['result'][field_name] = json.loads(jdict['result'][field_name])
+        print()
+        print(json.dumps(jdict))
+
         object._factory = self
 
         return object
@@ -424,8 +448,15 @@ class ObjectFactories:
 
         o = obj.to_json(columns=self.add_columns)
 
+        print('\n>>>>>>>>>>>>>>>>>>> base.add = payload:')
+        print(o)
+
         response = self.client.post(self.base_url, json=o)
         raise_for_status(response)
+
+        print('\n>>>>>>>>>>>>>>>>>>> base.add - response:')
+        print(response.json())
+
         obj.id = response.json().get("id")
         obj._factory = self
         return obj.id

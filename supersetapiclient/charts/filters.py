@@ -13,9 +13,12 @@ class AdhocFilterClause(Object):
     comparator: str
     subject: str
     clause: str = default_string(default='WHERE')
-    operator: FilterOperatorType = field(default_factory=FilterOperatorType.EQUAL)
-
-    expressionType: FilterExpressionType = field(default_factory=FilterExpressionType.SIMPLE)
+    operator: FilterOperatorType = FilterOperatorType.EQUAL
+    operatorId: str = field(init=False, default=str(FilterOperatorType.EQUAL))
+    expressionType: FilterExpressionType = FilterExpressionType.SIMPLE
 
     isExtra: bool = field(default=False)
     isNew: bool = field(default=False)
+
+    def __post_init__(self):
+        self.operatorId = str(self.operator)

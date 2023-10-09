@@ -11,7 +11,9 @@ class ParseMixin:
         return ParseClass(**kwargs)
 
     @classmethod
-    def get_class(cls, type_: str):
+    def get_class(cls, type_: str, module_name:str = None):
+        if not module_name:
+            module_name = cls.__module__
         suffix = cls.__name__
         class_name = f'{type_.capitalize()}{suffix}'
-        return getattr(sys.modules[cls.__module__], class_name, None)
+        return getattr(sys.modules[module_name], class_name, None)

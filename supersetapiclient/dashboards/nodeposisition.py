@@ -205,10 +205,11 @@ class CheckFreeSpaceMixin:
 
     def _get_next_row_free(self, item, parent):
         """
-            Se parent não existir gere uma exceção.
+            Se parent não existir dispare uma exceção.
+
+            Se parent não for Row ou Tab, retorne com uma nova row.
 
             # Tratamento quando item.relocate = False
-            Se não permite  permite realocação (item.relocate),
             checa se parent é uma row, se sim, verifica se há espaço,
             caso contrário, dispare a exceção.
 
@@ -263,7 +264,7 @@ class CheckFreeSpaceMixin:
                 # Aba não possui rows disponíveis, retornando uma nova
                 return self.get_new_node_position(RowItemPosition(), parent)
             else:
-                 raise NodePositionValidationError(f'Item {item.id} não pode ser inserindo no nó do tipo {parent.type_}. Inclua-o em um nó do tipo TAB ou ROW.')
+                return self.get_new_node_position(RowItemPosition(), parent)
 
     @classmethod
     def have_free_space(cls, row_node, item):

@@ -60,8 +60,6 @@ class TreeNodePosition:
                     metadata = data[child_position_id].get('meta', {})
                     if metadata:
                         kwargs.update(metadata)
-                    # if metadata.get('chartId'):
-                    #     breakpoint()
                     item_position = ItemPosition.get_instance(**kwargs)
                     tree.insert(item_position, parent_node)
                 cls.__generate_tree(child_position_id, data, tree)

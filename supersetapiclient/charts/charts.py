@@ -5,15 +5,15 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 from typing_extensions import Self
 
-from supersetapiclient.base.base import Object, ObjectFactories, default_string, raise_for_status, json_field
+from supersetapiclient.base.base import Object, ObjectFactories, default_string, raise_for_status
 from supersetapiclient.base.types import DatasourceType
 from supersetapiclient.charts.filters import AdhocFilterClause
-from supersetapiclient.charts.options import Option, PieOption
-from supersetapiclient.charts.queries import QueryFilterClause, Querie
+from supersetapiclient.charts.options import Option
+from supersetapiclient.charts.queries import QueryFilterClause, QueryObject, Column, AdhocMetricColumn
 
-from supersetapiclient.charts.query_context import QueryContext, PieQueryContext, DataSource
+from supersetapiclient.charts.query_context import QueryContext, DataSource
 from supersetapiclient.charts.types import ChartType, FilterOperatorType, FilterClausesType, FilterExpressionType, \
-    LabelType, LegendOrientationType, NumberFormatType, LegendType
+    MetricType, MetricType
 from supersetapiclient.dashboards.dashboards import Dashboard
 from supersetapiclient.dashboards.itemposition import ItemPosition
 from supersetapiclient.exceptions import NotFound, ChartValidationError
@@ -26,16 +26,14 @@ class Chart(Object):
 
     slice_name: str
     datasource_id: int = None
-    description: str = None
+    description: Optional[str] = field(default=None)
 
     viz_type: ChartType = None
 
-    #For post charts, optional fields are not used.
+    # For post charts, optional fields are not used.
     id: NotToJson[int] = None
 
     cache_timeout: NotToJson[int] = field(default=None)
-    result_format: NotToJson[str] = field(default='json')
-    result_type: NotToJson[str] = field(default='full')
 
     params: Option = field(default_factory=Option)
     query_context: QueryContext = field(default_factory=QueryContext)
@@ -62,14 +60,39 @@ class Chart(Object):
                 self.params.datasource = f'{self.datasource_id}__{self.datasource_type}'
                 self.query_context.form_data = self.params.datasource
 
+    def validate(self, data: dict):
+        pass
+        # TODO: validar se métrica e dimensão (groupby) consta em self.param, self.query_context.form_data
+        # self.query_context.queries
+
     @classmethod
-    def _get_type(self, data):
-        return data['viz_type']
+    def instance(cls,
+                 slice_name: str,
+                 datasource: DataSource,
+                 options: Option = Option()):
+
+        new_chart = cls(slice_name=slice_name,
+                        datasource_id=datasource.id,
+                        datasource_type=datasource.type)
+
+        options.datasource = f'{datasource.id}__{datasource.type}'
+        # options.groupby = groupby
+
+        ClassQuerie = QueryObject.get_class(type_=str(new_chart.viz_type))
+
+        # query = ClassQuerie(columns=groupby)
+        # new_chart.query_context.queries.append(query)
+
+        new_chart.params = options
+        new_chart.query_context.form_data = copy.deepcopy(options)
+        return new_chart
 
     def add_dashboard(self, dashboard):
         self.dashboards.append(dashboard)
+        self.query_context.add_dashboard(dashboard.id)
 
-    def clone(self, slice_name:str = None, slice_name_override:str = None,  clear_dashboard:bool = False, clear_filter:bool = True) -> Self:
+    def clone(self, slice_name: str = None, slice_name_override: str = None, clear_dashboard: bool = False,
+              clear_filter: bool = True) -> Self:
         new_chart = copy.deepcopy(self)
         new_chart.slice_name = slice_name or f'{new_chart.slice_name}_clone'
         new_chart._slice_name_override = slice_name_override or f'Chart clone de {new_chart.slice_name}'
@@ -89,35 +112,46 @@ class Chart(Object):
 
         self.query_context.form_data.adhoc_filters = []
 
-    def add_simple_filter(self, column_name:str,
+    def add_simple_metric(self, metric: MetricType, order: bool):
+        self.params._add_simple_metric(metric, order)
+        self.query_context._add_simple_metric(metric, order)
+
+
+    def add_custom_metric(self, label: str,
+                           sql_expression: str = None,
+                           column: AdhocMetricColumn = None,
+                           aggregate: MetricType = None):
+
+        if column:
+            column.id = self.id
+        self.params._add_custom_metric(label, sql_expression, column, aggregate)
+        self.query_context._add_custom_metric(label, sql_expression, column, aggregate)
+
+
+    def add_simple_groupby(self, column_name: str):
+        self.params._add_simple_groupby(column_name)
+        self.query_context._add_simple_groupby(column_name)
+
+    def add_custom_groupby(self, label: str,
+                            sql_expression: str = None,
+                            column: AdhocMetricColumn = None,
+                            aggregate: MetricType = None):
+        self.params._add_custom_groupby(label, sql_expression, column, aggregate)
+        self.query_context._add_custom_groupby(label, sql_expression, column, aggregate)
+
+
+    def add_simple_filter(self, column_name: str,
                           value: str,
-                          operator:FilterOperatorType = FilterOperatorType.EQUAL,
-                          clause:FilterClausesType = FilterClausesType.WHERE) -> None:
+                          operator: FilterOperatorType = FilterOperatorType.EQUAL,
+                          clause: FilterClausesType = FilterClausesType.WHERE) -> None:
+        self.params._add_simple_filter(column_name, value, operator, clause)
+        self.query_context._add_simple_filter(column_name, value, operator, clause)
 
-        if not self.query_context.queries:
-            raise ChartValidationError("""The queries list is empty. 
-                        It is impossible to define the columns and metrics attributes.""")
-
-        if len(self.query_context.queries) > 1:
-            raise ChartValidationError("""There are more than one query in the queries list. 
-                                       We don't know which one to include the filter in.""")
-
-        adhoc_filter_clause = AdhocFilterClause(comparator=value,
-                                                subject=column_name,
-                                                clause=clause,
-                                                operator=operator,
-                                                expressionType=FilterExpressionType.SIMPLE)
-
-        self.params.adhoc_filters.append(adhoc_filter_clause)
-        self.query_context.form_data.adhoc_filters.append(adhoc_filter_clause)
-
-        self.params.adhoc_filters == self.query_context.form_data.adhoc_filters
-        query_filter_clause = QueryFilterClause(col=column_name, val=value, op=operator)
-        self.query_context.queries[0].filters.append(query_filter_clause)
 
 
     def to_json(self, columns=None):
         data = super().to_json(columns).copy()
+
         dashboards = set()
         for dasboard in self.dashboards:
             dashboards.add(dasboard.id)
@@ -129,7 +163,7 @@ class Chart(Object):
         obj = super().from_json(data)
         obj._dashboards = obj.dashboards
 
-        #set default datasource
+        # set default datasource
         datasource = obj.query_context.datasource
         if datasource:
             obj.datasource_id = datasource.id
@@ -142,7 +176,17 @@ class Charts(ObjectFactories):
     endpoint = "chart/"
     base_object = Chart
 
-    def get_chart_data(self, slice_id:str, dashboard_id: int) -> dict:
+    def get_base_object(self, data):
+        type_ = data['viz_type']
+        if type_:
+            m = self.base_object.__module__.split('.')
+            m.pop(-1)
+            m.append(data['viz_type'])
+            module_name = '.'.join(m)
+            return self.base_object.get_class(type_, module_name)
+        return self.base_object
+
+    def get_chart_data(self, slice_id: str, dashboard_id: int) -> dict:
         chart = self.client.charts.get(slice_id)
         dashboard_exists = False
         for id in chart.params.dashboards:
@@ -151,9 +195,7 @@ class Charts(ObjectFactories):
         if not dashboard_exists:
             raise NotFound(f'Dashboard id {dashboard_id} does not exist.')
 
-
-        #'http://localhost:8088/api/v1/chart/data?form_data=%7B%22slice_id%22%3A347%7D&dashboard_id=12&force'
-        breakpoint()
+        # 'http://localhost:8088/api/v1/chart/data?form_data=%7B%22slice_id%22%3A347%7D&dashboard_id=12&force'
         query = {
             "slice_id": slice_id,
             "dashboard_id": dashboard_id,
@@ -165,7 +207,7 @@ class Charts(ObjectFactories):
             'force': chart.force,
             'queries': chart.query_context.queries.to_json(),
             'form_data': chart.query_context.form_data.to_json(),
-            'result_format':chart.result_format,
+            'result_format': chart.result_format,
             'result_type': chart.result_type
         }
 
@@ -176,7 +218,7 @@ class Charts(ObjectFactories):
         raise_for_status(response)
         return response.json().result('result')
 
-    def add(self, chart:Chart, title:str, parent: ItemPosition = None, update_dashboard=True) -> int:
+    def add(self, chart: Chart, title: str, parent: ItemPosition = None, update_dashboard=True) -> int:
         id = super().add(chart)
 
         try:
@@ -190,7 +232,7 @@ class Charts(ObjectFactories):
             raise
         return id
 
-    def add_to_dashboard(self, chart:Chart, dashboard_id=int):
+    def add_to_dashboard(self, chart: Chart, dashboard_id=int):
         url = self.client.join_urls(self.base_url, "/data")
         query = {
             'slice_id': chart.id,
@@ -202,36 +244,3 @@ class Charts(ObjectFactories):
         response = self.client.post(url, params=params, json=payload)
         raise_for_status(response)
         return response.json()
-
-
-@dataclass
-class PieChart(Chart):
-    viz_type: ChartType = ChartType.PIE
-    params: PieOption = field(default_factory=PieOption)
-    query_context: PieQueryContext = field(default_factory=PieQueryContext)
-
-
-    #GET http://localhost:8088/superset/fetch_datasource_metadata?datasourceKey=24__table
-    @classmethod
-    def instance(cls,
-                 slice_name:str,
-                 datasource: DataSource,
-                 groupby: list[str],
-                 options: PieOption = Option()):
-
-        new_chart = cls(slice_name=slice_name,
-                   datasource_id   = datasource.id,
-                   datasource_type = datasource.type)
-
-        options.datasource = f'{datasource.id}__{datasource.type}'
-        options.groupby= groupby
-
-        query = Querie(columns=groupby)
-        new_chart.query_context.queries.append(query)
-
-        new_chart.params = options
-        new_chart.query_context.form_data = copy.deepcopy(options)
-
-        # breakpoint()
-
-        return new_chart

@@ -47,12 +47,23 @@ class LoadJsonError(Exception):
     pass
 
 
-class NodePositionValidationError(Exception):
-    pass
+class ValidationError(Exception):
+    def __init__(self, message:str, solution:str = None):
+        # from django.core.exceptions import ValidationError
+        super().__init__(message, solution)
+        self.message = message
+        self.solution = solution
+
+class NodePositionValidationError(ValidationError):
+    def __init__(self, message:str, solution:str = None):
+        super().__init__(message, solution)
 
 
-class DashboardValidationError(Exception):
-    pass
+class DashboardValidationError(ValidationError):
+    def __init__(self, message:str, solution:str = None):
+        super().__init__(message, solution)
 
-class ChartValidationError(Exception):
-    pass
+
+class ChartValidationError(ValidationError):
+    def __init__(self, message:str, solution:str = None):
+        super().__init__(message, solution)

@@ -1,8 +1,11 @@
+from enum import IntEnum
+
 from supersetapiclient.base.enum_str import StringEnum
 
 
 class ChartType(StringEnum):
     PIE = 'pie'
+    TABLE = 'table'
 
 
 #https://github.com/apache/superset/blob/8553b06155249c3583cf0dcd22221ec06cbb833d/superset-frontend/plugins/plugin-chart-echarts/src/types.ts
@@ -69,6 +72,28 @@ class DateFormatType(StringEnum):
     TIME = '%H:%M:%S'
 
 
+class TimeGrain(StringEnum):
+    SECOND = "PT1S"
+    FIVE_SECONDS = "PT5S"
+    THIRTY_SECONDS = "PT30S"
+    MINUTE = "PT1M"
+    FIVE_MINUTES = "PT5M"
+    TEN_MINUTES = "PT10M"
+    FIFTEEN_MINUTES = "PT15M"
+    THIRTY_MINUTES = "PT30M"
+    HALF_HOUR = "PT0.5H"
+    HOUR = "PT1H"
+    SIX_HOURS = "PT6H"
+    DAY = "P1D"
+    WEEK = "P1W"
+    WEEK_STARTING_SUNDAY = "1969-12-28T00:00:00Z/P1W"
+    WEEK_STARTING_MONDAY = "1969-12-29T00:00:00Z/P1W"
+    WEEK_ENDING_SATURDAY = "P1W/1970-01-03T00:00:00Z"
+    WEEK_ENDING_SUNDAY = "P1W/1970-01-04T00:00:00Z"
+    MONTH = "P1M"
+    QUARTER = "P3M"
+    QUARTER_YEAR = "P0.25Y"
+    YEAR = "P1Y"
 class LabelType(StringEnum):
     CATEGORY_NAME ='key'
     VALUE = 'value'
@@ -114,14 +139,64 @@ class FilterStringOperatorsType(StringEnum):
     IS_TRUE = ("IS_TRUE",)
     IS_FALSE = ("IS_FALSE",)
 
+
 class FilterExpressionType(StringEnum):
     SIMPLE = 'SIMPLE'
     CUSTOM_CQL = 'SQL'
 
 
+class SqlMapType(StringEnum):
+    BOOLEAN = "BOOLEAN"
+    INTEGER = "INTEGER"
+    VARCHAR = "VARCHAR"
+    STRING = "STRING"
+    TEXT = "TEXT"
+    BIGINT = "BIGINT"
+    FLOAT = "FLOAT"
+    FLOAT64 = "FLOAT64"
+    DOUBLE_PRECISION = "DOUBLE PRECISION"
+    DATE = "DATE"
+    DATETIME = "DATETIME"
+    TIMESTAMP_WITHOUT_TIME_ZONE = "TIMESTAMP WITHOUT TIME ZONE"
+    TIMESTAMP_WITH_TIME_ZONE = "TIMESTAMP WITH TIME ZONE"
+
+
+class GenericDataType(IntEnum):
+    NUMERIC = 0
+    STRING = 1
+    TEMPORAL = 2
+    BOOLEAN = 3
+    # ARRAY = 4     # Mapping all the complex data types to STRING for now
+    # JSON = 5      # and leaving these as a reminder.
+    # MAP = 6
+    # ROW = 7
+
 class FilterClausesType(StringEnum):
   HAVING = 'HAVING'
   WHERE = 'WHERE'
+
+
+class QueryModeType(StringEnum):
+    RAW = "raw"
+    AGGREGATE = "aggregate"
+
+
+class MetricType(StringEnum):
+    COUNT_DISTINCT = "COUNT_DISTINCT"
+    COUNT = "count"
+    SUM = "sum"
+    AVG = "avg"
+    MIN = "min"
+    MAX = "max"
+#
+#
+# class AggregateType(StringEnum):
+#     COUNT_DISTINCT = "COUNT_DISTINCT"
+#     COUNT = "COUNT"
+#     SUM = "SUM"
+#     AVG = "AVG"
+#     MIN = "MIN"
+#     MAX = "MAX"
 
 class CurrencyCodeType(StringEnum):
     AED = 'AED'
@@ -286,3 +361,8 @@ class CurrencyCodeType(StringEnum):
 class CurrentPositionType(StringEnum):
     PREFIX = 'prefix'
     SUFFIX = 'suffix'
+
+class HorizontalAlignType(StringEnum):
+    LEFT = 'left'
+    RIGHT = 'right'
+    CENTER = 'center'

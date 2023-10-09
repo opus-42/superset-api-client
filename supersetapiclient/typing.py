@@ -13,3 +13,4 @@ class NotToJson(Generic[T]):
 
 FilterValue = Union[bool, datetime, float, int, str]
 FilterValues = Union[FilterValue, list[FilterValue], tuple[FilterValue]]
+
