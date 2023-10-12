@@ -260,13 +260,12 @@ class Object(ParseMixin):
             if isinstance(value, Object):
                 value = value.to_dict(columns)
             elif isinstance(value, list):
-                instance_is_object = False
                 values_data = []
-                for obj in value:
-                    if isinstance(obj, Object):
-                        instance_is_object = True
-                        values_data.append(obj.to_dict(columns))
-                if instance_is_object:
+                for field_value in value:
+                    if isinstance(field_value, Object):
+                        values_data.append(field_value.to_dict(columns))
+                    else:
+                        values_data.append(field_value)
                     value = values_data
             if c=='chart_configuration' and isinstance(value, dict):
                 field = self.get_field(c)
@@ -402,14 +401,15 @@ class ObjectFactories:
         result["id"] = id
 
         BaseClass = self.get_base_object(data_result)
-        object = BaseClass.from_json(data_result)
+        # object = BaseClass.from_json(data_result)
 
         print('\n>>>>>>>>>>>>>>>>>>> base.get - response:')
         jdict = response.json()
-        for field_name in object.JSON_FIELDS:
+        for field_name in BaseClass.JSON_FIELDS:
             jdict['result'][field_name] = json.loads(jdict['result'][field_name])
         print()
         print(json.dumps(jdict))
+        breakpoint()
 
         object._factory = self
 

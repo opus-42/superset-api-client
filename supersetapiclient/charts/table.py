@@ -85,7 +85,7 @@ class TableChart(Chart):
     params: TableOption = field(default_factory=TableOption)
     query_context: TableQueryContext = field(default_factory=TableQueryContext)
 
-    def _add_custom_metric(self, label: str,
+    def add_custom_metric(self, label: str,
                            sql_expression: str = None,
                            column: AdhocMetricColumn = None,
                            aggregate: MetricType = None,

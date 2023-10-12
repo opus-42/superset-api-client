@@ -144,7 +144,6 @@ class MetricMixin:
         dimensions = getattr(self, self_field)
         if not dimensions or (get_args(dimensions) and get_args(dimensions)[0] == OrderBy):
             dimensions: List[str] = []
-
         dimensions.append(metric)
         setattr(self, self_field, dimensions)
 
