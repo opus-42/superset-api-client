@@ -28,7 +28,6 @@ from supersetapiclient.saved_queries import SavedQueries
 
 logger = logging.getLogger(__name__)
 
-
 class SupersetClient:
     """A Superset Client."""
 
@@ -252,10 +251,12 @@ class SupersetClient:
             "filters": filter.filters,
             "columns" :columns
         }
+        logger.debug(f'client.find query string: {query}')
 
         params = {"q": json.dumps(query)}
 
         response = self.get(url, params=params)
+        logger.debug(f'client.find response: {response.json()}')
         raise_for_status(response)
         return response.json()
 

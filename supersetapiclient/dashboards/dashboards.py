@@ -32,6 +32,19 @@ class Dashboard(Object):
     position_json: Metadataposition = field(default_factory=Metadataposition)
     # charts: List[Chart] = field(default_factory=Chart)
 
+    def __post_init__(self):
+        self._charts_slice_names = []
+
+    @classmethod
+    def from_json(cls, data: dict):
+        obj = super().from_json(data)
+        obj._charts_slice_names  = obj._extra_fields.get('charts', [])
+        return obj
+
+    @property
+    def charts_slice_names(self):
+        return self._charts_slice_names
+
     @property
     def metadata(self):
         return self.json_metadata
@@ -62,7 +75,6 @@ class Dashboard(Object):
                     node_position = grid
         self.position.add_chart(chart, title, node_position)
 
-
     @property
     def colors(self) -> dict:
         """Get dashboard color mapping."""
@@ -83,16 +95,22 @@ class Dashboard(Object):
         """Get chart objects"""
         #http://localhost:8088/api/v1/dashboard/21/charts
         charts = []
-        for slice_name in self.charts:
+        for slice_name in self.charts_slice_names:
             c = self._factory.client.charts.find_one(slice_name=slice_name)
             charts.append(c)
         return charts
 
-    def get_datasets(self):
-        pass
-        #http://localhost:8088/api/v1/dashboard/21/datasets
+    def delete(self, exclude_charts:bool = False) -> bool:
+        deleted = self._factory.delete(id=self.id)
+        if deleted and exclude_charts:
+            for chart in self.get_charts():
+                breakpoint()
+                chart.delete()
 
 
 class Dashboards(ObjectFactories):
     endpoint = "dashboard/"
     base_object = Dashboard
+
+    def get_base_object(self, data):
+        return self.base_object

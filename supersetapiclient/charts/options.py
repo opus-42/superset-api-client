@@ -19,7 +19,7 @@ class Option(Object, MetricMixin):
 
     adhoc_filters: List[AdhocFilterClause] = field(default_factory=list)
     dashboards: List[int] = field(default_factory=list)
-    groupby: Optional[List[OrderBy]] = None
+    groupby: Optional[List[OrderBy]] = field(default_factory=list)
 
     def add_dashboard(self, dashboard_id):
         dashboards = set(self.dashboards)
@@ -31,7 +31,6 @@ class Option(Object, MetricMixin):
                            value: str,
                            operator: FilterOperatorType = FilterOperatorType.EQUAL,
                            clause: FilterClausesType = FilterClausesType.WHERE) -> None:
-
         adhoc_filter_clause = AdhocFilterClause(comparator=value,
                                                 subject=column_name,
                                                 clause=clause,

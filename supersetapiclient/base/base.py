@@ -8,6 +8,8 @@ from supersetapiclient.base.parse import ParseMixin
 from supersetapiclient.client import QueryStringFilter
 from supersetapiclient.typing import NotToJson
 
+logger = logging.getLogger(__name__)
+
 try:
     from functools import cached_property
 except ImportError:  # pragma: no cover
@@ -17,14 +19,13 @@ except ImportError:  # pragma: no cover
 import json
 import os.path
 from pathlib import Path
-from typing import List, Union, Dict, get_args, get_origin, Any
+from typing import List, Union, Dict, get_args, get_origin, Any, Literal
 
 import yaml
 from requests import HTTPError
 
 from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound, \
     LoadJsonError, ValidationError
-
 
 class ObjectDecoder(json.JSONEncoder):
     def default(self, obj):
@@ -151,17 +152,40 @@ class Object(ParseMixin):
     def _subclass_object(cls, field_name:str):
         field = cls.get_field(field_name)
         ObjectClass = field.type
+        logger.debug(f'_subclass_object field_name: {field_name}; field.type: {field.type}')
         type_ = None
         while get_origin(ObjectClass):
             if get_args(ObjectClass):
                 if len(get_args(ObjectClass)) == 2:
                     type_, ObjectClass = get_args(ObjectClass)
+                    if 'NoneType' in str(ObjectClass):
+                        if get_args(type_) and len(get_args(type_)) > 1:
+                            type_, ObjectClass = get_args(type_)
+                            logger.debug(f'_subclass_object while get_origin(ObjectClass) > if get_args(ObjectClass) > if len(get_args(ObjectClass)) == 2 > if "NoneType" in str(ObjectClass)')
+                            logger.debug(f'_subclass_object type_: {type_}, ObjectClass: {ObjectClass}')
+                        else:
+                            ObjectClass = get_args(type_) or None
+                            logger.debug(f'_subclass_object while get_origin(ObjectClass) > if get_args(ObjectClass) > if len(get_args(ObjectClass)) == 2 > else if "NoneType" in str(ObjectClass)')
+                            logger.debug(f'_subclass_object ObjectClass: {ObjectClass}')
                 else:
-                    ObjectClass = get_args(ObjectClass)[-1]
+                    if get_origin(ObjectClass) is Literal:
+                        ObjectClass = None
+                        logger.debug(f'_subclass_object while get_origin(ObjectClass) > if get_args(ObjectClass) > else if len(get_args(ObjectClass)) == 2 > if get_origin(ObjectClass) is Literal')
+                    else:
+                        logger.debug(f'_subclass_object while get_origin(ObjectClass) > if get_args(ObjectClass) > else if len(get_args(ObjectClass)) == 2 > else if get_origin(ObjectClass) is Literal')
+                        ObjectClass = get_args(ObjectClass)[-1]
+                    logger.debug(f'>>> ObjectClass: {ObjectClass}')
             else:
                 break
+
+        if 'NoneType' in str(ObjectClass):
+            ObjectClass = None
+        if 'NoneType' in str(type_):
+            type_ = None
         if cls._issubclass_object(ObjectClass):
             return type_, ObjectClass
+        elif cls._issubclass_object(type_):
+            return ObjectClass, type_
         return type_, None
 
     @classmethod
@@ -188,6 +212,7 @@ class Object(ParseMixin):
                     setattr(obj, field_name, value)
 
             for field_name, data_value in data.items():
+                logger.debug(f'from_json field_name: {field_name}; data_value: {data_value}')
                 if field_name in cls.JSON_FIELDS:
                     continue
                 if isinstance(data_value, dict):
@@ -202,7 +227,6 @@ class Object(ParseMixin):
                     else:
                         value = data_value
                     setattr(obj, field_name, value)
-
                 elif isinstance(data_value, list):
                     type_, ObjectClass = cls._subclass_object(field_name)
                     if ObjectClass is None:
@@ -221,10 +245,10 @@ class Object(ParseMixin):
                 cls={cls}
                 field_name={field_name}
                 data_value={data_value}
-                cata={data}
+                data={data}
                 extra_fields={extra_fields}
             """
-            logging.error(msg)
+            logger.exception(msg)
             raise LoadJsonError(err)
         return obj
 
@@ -257,9 +281,9 @@ class Object(ParseMixin):
             value = getattr(self, c)
             if isinstance(value, Enum):
                 value = str(value)
-            if isinstance(value, Object):
+            if value and isinstance(value, Object):
                 value = value.to_dict(columns)
-            elif isinstance(value, list):
+            elif value and isinstance(value, list):
                 values_data = []
                 for field_value in value:
                     if isinstance(field_value, Object):
@@ -267,19 +291,33 @@ class Object(ParseMixin):
                     else:
                         values_data.append(field_value)
                     value = values_data
-            if c=='chart_configuration' and isinstance(value, dict):
-                field = self.get_field(c)
-                if get_args(field.type) and issubclass(get_args(field.type)[-1], Object):
+            if value and isinstance(value, dict):
+                ProbableObjectClass1, ProbableObjectClass2 = self._subclass_object(c)
+                if ProbableObjectClass1 and ProbableObjectClass2:
                     _value = {}
-                    for k, obj in value.items():
-                        _value[k] =  obj.to_dict(columns)
+                    if self._issubclass_object(ProbableObjectClass1):
+                        for ojb, value_ in value.items():
+                            _value[obj.to_dict()] = value_
+                    elif self._issubclass_object(ProbableObjectClass2):
+                        for k, obj in value.items():
+                            _value[k] =  obj.to_dict()
+                    else:
+                        msg = f"""self={self}
+                            field_name={c}
+                            data_value={value}
+                            data={data}
+                            ProbableObjectClass1={ProbableObjectClass1}
+                            ProbableObjectClass2={ProbableObjectClass2}
+                        """
+                        logger.error(msg)
+                        raise ValidationError('Unable to determine ObjectClass')
                     value = _value
             data[c] = value
         return data
 
     def to_json(self, columns=[]) -> dict:
         data = self.to_dict(columns)
-        print('>>>>', data)
+        logger.debug(f'base.to_json - data: {data}')
         self.validate(data)
 
         for field in self.JSON_FIELDS:
@@ -322,16 +360,11 @@ class Object(ParseMixin):
     def save(self) -> None:
         """Save object information."""
         o = self.to_json(columns=self._factory.edit_columns)
-
-        print('\n>>>>>>>>>>>>>>>>>>> base.save - payload:')
-        print(o)
+        logger.info(f'base.save - payload: {o}')
 
         response = self._factory.client.put(self.base_url, json=o)
-
-        print('\n>>>>>>>>>>>>>>>>>>> base.save - response:')
-        print(response.json())
-
         raise_for_status(response)
+        logger.info(f'base.save - response: {response.json()}')
 
     def delete(self) -> bool:
         return self._factory.delete(id=self.id)
@@ -354,6 +387,7 @@ class ObjectFactories:
 
     @abstractmethod
     def get_base_object(self, data):
+        logger.error(f'Abstract Method "get_base_object" not implemented, self: {self}')
         raise NotImplemented()
 
     @cached_property
@@ -396,21 +430,18 @@ class ObjectFactories:
         raise_for_status(response)
 
         result = response.json()
+        logger.info(f'base.get - response: {result}')
 
         data_result = result['result']
         result["id"] = id
-
         BaseClass = self.get_base_object(data_result)
-        # object = BaseClass.from_json(data_result)
 
-        print('\n>>>>>>>>>>>>>>>>>>> base.get - response:')
-        jdict = response.json()
-        for field_name in BaseClass.JSON_FIELDS:
-            jdict['result'][field_name] = json.loads(jdict['result'][field_name])
-        print()
-        print(json.dumps(jdict))
-        breakpoint()
+        # jdict = response.json()
+        # for field_name in BaseClass.JSON_FIELDS:
+        #     jdict['result'][field_name] = json.loads(jdict['result'][field_name])
+        # logger.debug(f'base.get: {json.dumps(jdict)}')
 
+        object = BaseClass.from_json(data_result)
         object._factory = self
 
         return object
@@ -447,17 +478,14 @@ class ObjectFactories:
         """Create an object on remote."""
 
         o = obj.to_json(columns=self.add_columns)
-
-        print('\n>>>>>>>>>>>>>>>>>>> base.add = payload:')
-        print(o)
+        logger.info(f'base.add - payload: {o}')
 
         response = self.client.post(self.base_url, json=o)
         raise_for_status(response)
+        result = response.json()
+        logger.info(f'base.add - response: {result}')
 
-        print('\n>>>>>>>>>>>>>>>>>>> base.add - response:')
-        print(response.json())
-
-        obj.id = response.json().get("id")
+        obj.id = result.get("id")
         obj._factory = self
         return obj.id
 
@@ -491,8 +519,10 @@ class ObjectFactories:
     def delete(self, id: int) -> bool:
         """Delete a object on remote."""
         url = self.client.join_urls(self.base_url, id)
+        logger.info(f'base.delete url: {url}')
         response = self.client.delete(url)
         raise_for_status(response)
+        logger.info(f'base.delete response: {response.json()}')
         return response.json().get("message") == "OK"
 
     def import_file(self, file_path, overwrite=False, passwords=None) -> dict:

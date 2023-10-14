@@ -23,29 +23,29 @@ class TableOption(Option):
     show_totals: Optional[bool] = False
 
     table_timestamp_format: DateFormatType = DateFormatType.SMART_DATE
-    page_length: Optional[int] = field(init=False, default=None)
-    include_search: Optional[bool] = field(init=False, default=False)
+    page_length: Optional[int] = None
+    include_search: Optional[bool] = False
     show_cell_bars: bool = True
-    align_pn: Optional[bool] = field(init=False, default=False)
+    align_pn: Optional[bool] = False
     color_pn: bool = True
-    allow_rearrange_columns: Optional[bool] = field(init=False, default=False)
+    allow_rearrange_columns: Optional[bool] = False
 
-    column_config: Optional[ColumnConfig] = field(default_factory=list)
+    column_config: Optional[Dict[str,ColumnConfig]] = field(default_factory=dict)
 
     conditional_formatting: Optional[List] = field(default_factory=list)
 
-    # percent_metrics: List = field(default_factory=list)
-    # all_columns: List = field(default_factory=list)
+    ## percent_metrics: List = field(default_factory=list)
+    ## all_columns: List = field(default_factory=list)
 
     metrics: Optional[List[Metric]] = field(default_factory=list)
     queryFields: Optional[Dict] = field(default_factory=dict)
 
-    table_filter: Optional[bool] = field(init=False, default=False)
-    time_grain_sqla: Optional[TimeGrain] = field(default_factory=TimeGrain)
-    time_range: Optional[str] = field(init=False, default='No filter')
+    table_filter: Optional[bool] = False
+    time_grain_sqla: Optional[TimeGrain] = None
+    time_range: Optional[str] = 'No filter'
 
     columns: List[Column] = field(default_factory=list)
-    granularity_sqla: Optional[str] = field(init=False, default=None)
+    granularity_sqla: Optional[str] = None
 
     def __post_init__(self):
         if self.server_page_length == 0:
@@ -55,6 +55,9 @@ class TableOption(Option):
 
     def _add_simple_orderby(self, column_name:str, order:bool):
         self.order_by_cols.append([column_name, order])
+
+    def _add_column_config(self, label:str, column_config:ColumnConfig):
+        self.column_config[label] = column_config
 
 
 @dataclass
@@ -70,7 +73,7 @@ class TableQueryContext(QueryContext):
 @dataclass
 class TableQueryObject(QueryObject):
     time_range: Optional[str] = field(init=False, default='No Filter')
-    granularity: Optional[str] = field(init=False, default=None)
+    granularity: Optional[str] = None
     applied_time_extras: List[str] = field(default_factory=list)
     # columns: List[Column] = field(default_factory=list)
 
@@ -92,5 +95,5 @@ class TableChart(Chart):
                            column_config: ColumnConfig = None):
         super().add_custom_metric(label, sql_expression, column, aggregate)
         if column_config:
-            self.column_config[label] = column_config
+            self.params._add_column_config(label, column_config)
 

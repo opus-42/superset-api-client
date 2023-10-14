@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Optional
 
 from supersetapiclient.base.base import Object, default_string
 from supersetapiclient.charts.types import FilterOperatorType, FilterExpressionType
@@ -10,11 +11,11 @@ from supersetapiclient.charts.types import FilterOperatorType, FilterExpressionT
 
 @dataclass
 class AdhocFilterClause(Object):
-    comparator: str
     subject: str
+    comparator: Optional[str] = None
     clause: str = default_string(default='WHERE')
     operator: FilterOperatorType = FilterOperatorType.EQUAL
-    operatorId: str = field(init=False, default=str(FilterOperatorType.EQUAL))
+    operatorId: str = field(default=FilterOperatorType.EQUAL.name)
     expressionType: FilterExpressionType = FilterExpressionType.SIMPLE
 
     isExtra: bool = field(default=False)
