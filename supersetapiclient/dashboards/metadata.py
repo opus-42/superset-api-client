@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List, Dict, Optional
 from supersetapiclient.base.base import Object, default_string, json_field
 
 @dataclass
@@ -39,7 +39,7 @@ class Metadata(Object):
     label_colors: Dict = field(default_factory=dict)
     timed_refresh_immune_slices: List[str] = field(default_factory=list)
     cross_filters_enabled: bool = field(default=False)
-    filter_scopes: Dict = field(default_factory=dict)
+    filter_scopes: Optional[Dict] = field(default_factory=dict)
     chart_configuration: Dict[str, ChartConfiguration] = field(default_factory=dict)
     global_chart_configuration: GlobalChartconfiguration = field(default_factory=GlobalChartconfiguration)
     default_filters: Dict = field(default_factory=dict)

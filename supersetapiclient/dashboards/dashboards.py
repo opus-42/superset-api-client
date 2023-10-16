@@ -53,7 +53,7 @@ class Dashboard(Object):
     def position(self):
         return self.position_json
 
-    def add_chart(self, chart, title:str, parent: ItemPosition=None):
+    def add_chart(self, chart, title:str, parent: ItemPosition=None, height: int = 50, width: int = 4, relocate:bool = True):
         chart.add_dashboard(self)
         if not self.id:
             raise DashboardValidationError('To add charts, first save the dashboard. Do this by calling the client.dashboards.add([this-dashboard]) method.')
@@ -73,7 +73,7 @@ class Dashboard(Object):
                     node_position = grid.children[-1]
                 if not isinstance(node_position, RowNodePosition):
                     node_position = grid
-        self.position.add_chart(chart, title, node_position)
+        self.position.add_chart(chart, title, node_position, height, width, relocate)
 
     @property
     def colors(self) -> dict:

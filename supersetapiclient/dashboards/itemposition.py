@@ -70,7 +70,6 @@ class ItemPosition(ParseMixin):
             self.children = kwargs.get('children', [])
         if not hasattr(self, 'parents'):
             self.parents = kwargs.get('parents', [])
-
         if kwargs.get('meta'):
             if hasattr(self, 'meta'):
                 self.meta.__dict__.update(kwargs['meta'])
@@ -129,8 +128,8 @@ class TabItemPosition(ItemPosition):
     def __init__(self, text:str, **kwargs):
         self.meta = MetaItemPosition({
             'text': text,
-            'defaultText': 'Tab title',
-            'placeholder': 'Tab title'
+            # 'defaultText': 'Tab title',
+            # 'placeholder': 'Tab title'
         })
         super().__init__(type_=ItemPositionType.TAB, **kwargs)
 
@@ -157,12 +156,18 @@ class RowItemPosition(ItemPosition):
     def background(self):
         return self.meta.background
 
+
+class DividerItemPosition(ItemPosition):
+    def __init__(self, **kwargs):
+        self.meta = MetaItemPosition({})
+        super().__init__(type_=ItemPositionType.DIVIDER, **kwargs)
+
+
 class RelocateMixin:
     def __init__(self, relocate:bool, **kwargs):
         self.relocate = relocate
 
         width = self.meta.width
-        height =self.meta.height
 
         if not relocate and width > ItemPosition.MAX_WIDTH:
             raise NodePositionValidationError(f'Maximum width allowed is  {ItemPosition.MAX_WIDTH}')
@@ -170,16 +175,37 @@ class RelocateMixin:
         if width <= 0:
             raise NodePositionValidationError('Width must be greater than zero')
 
-        if height <= 0:
-            raise NodePositionValidationError('Height must be greater than zero')
-
         super().__init__(**kwargs)
+
+
+class ColumnItemPosition(RelocateMixin, ItemPosition):
+    ACCEPT_CHILD = True
+
+    def __init__(self, width: int = 4, background:str = 'BACKGROUND_TRANSPARENT', relocate:bool = True, **kwargs):
+        _meta = {
+            "background": background,
+            'width': width
+        }
+        self.meta = MetaItemPosition(_meta)
+
+        super().__init__(relocate=relocate, type_=ItemPositionType.COLUMN, **kwargs)
+
+    @property
+    def background(self):
+        return self.meta.code
+
+    @property
+    def width(self):
+        return self.meta.width
 
 
 class MarkdownItemPosition(RelocateMixin, ItemPosition):
     ACCEPT_CHILD = False
 
     def __init__(self, code:str='', height: int = 50, width: int = 4, relocate:bool = True, **kwargs):
+        if height <= 0:
+            raise NodePositionValidationError('Height must be greater than zero')
+
         _meta = {
             'code': code,
             'height': height,
@@ -202,12 +228,6 @@ class MarkdownItemPosition(RelocateMixin, ItemPosition):
         return self.meta.height
 
 
-class DividerItemPosition(ItemPosition):
-    def __init__(self, **kwargs):
-        self.meta = MetaItemPosition({})
-        super().__init__(type_=ItemPositionType.DIVIDER, **kwargs)
-
-
 class ChartItemPosition(RelocateMixin, ItemPosition):
     ACCEPT_CHILD = False
     def __init__(self, chartId: int, sliceName: str, sliceNameOverride: str = None, height: int = 50, width: int = 4, uuid: str = None, relocate:bool = True, **kwargs):
@@ -215,14 +235,18 @@ class ChartItemPosition(RelocateMixin, ItemPosition):
             raise NodePositionValidationError('chartId argument cannot be null or empty')
         if not sliceName:
             raise NodePositionValidationError('sliceName argument cannot be null or empty')
+        if height <= 0:
+            raise NodePositionValidationError('Height must be greater than zero')
 
         _meta = {
             'chartId': chartId,
             'sliceName': sliceName,
-            'sliceNameOverride': sliceNameOverride,
             'height': height,
             'width': width
         }
+        if sliceNameOverride:
+            _meta['sliceNameOverride'] = sliceNameOverride
+
         if uuid:
             _meta.update({'uuid':uuid})
 

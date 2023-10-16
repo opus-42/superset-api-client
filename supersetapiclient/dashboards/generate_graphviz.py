@@ -47,6 +47,5 @@ class GenerateGraphMixin:
         filename = os.path.join(dir_path, 'treenode.svg')
         dot.render(outfile=filename).replace('\\', '/')
 
-
     def print_position_tree(self):
        self.treenode.print()

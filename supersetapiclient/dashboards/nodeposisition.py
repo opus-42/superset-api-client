@@ -1,3 +1,4 @@
+import logging
 from typing import List
 
 from anytree import Node, RenderTree
@@ -7,8 +8,10 @@ from typing_extensions import Self
 
 from supersetapiclient.base.parse import ParseMixin
 from supersetapiclient.dashboards.itemposition import ItemPositionType, ItemPosition, TabsItemPosition, \
-    TabItemPosition, MarkdownItemPosition, RowItemPosition, GridItemPosition, DividerItemPosition
+    TabItemPosition, MarkdownItemPosition, RowItemPosition, GridItemPosition, DividerItemPosition, ColumnItemPosition
 from supersetapiclient.exceptions import AcceptChildError, NodePositionValidationError
+
+logger = logging.getLogger(__name__)
 
 class NodePosition(Node, ParseMixin):
     def __init__(self, item: ItemPosition, parent: Self=None):
@@ -25,7 +28,7 @@ class NodePosition(Node, ParseMixin):
     def _add_child(self,  parent: Self):
         if parent:
             parent.item.children.append(self.item.id)
-            self.item.parents.append(parent.item.id)
+            self.item.parents = [p.item.id for p in self.path][:-1]
 
     @property
     def item(self):
@@ -192,99 +195,153 @@ class DividerNodePosistion(NodePosition):
 
 
 class CheckFreeSpaceMixin:
-    def __init__(self, item: MarkdownItemPosition, parent: Self = None):
+    def __init__(self, item: ItemPosition, parent: Self = None):
+        if not hasattr(self, 'parent'):
+            self.parent = parent
+
         self._validate(item)
 
         parent = self._get_next_row_free(item, parent)
-
-        # if parent and parent.type_ != ItemPositionType.ROW:
-        #     parent = self._insert_parent(RowItemPosition(), parent, RowNodePosition)
-
         super().__init__(item, parent)
 
 
-    def _get_next_row_free(self, item, parent):
+    def _get_next_row_free(self, item:ItemPosition, thisnode:NodePosition) ->NodePosition:
         """
-            Se parent não existir dispare uma exceção.
+            If thisnode does not exist, throw an exception.
 
-            Se parent não for Row ou Tab, retorne com uma nova row.
+            If thisnode is not Row or Tab, return a new row.
 
-            # Tratamento quando item.relocate = False
-            checa se parent é uma row, se sim, verifica se há espaço,
-            caso contrário, dispare a exceção.
+            # Handling when item.relocate = False
+            checks if thisnode is a row, if yes, checks if there is space,
+            otherwise, throw the exception.
 
-            Se parente for um TAB, crie uma nova row.
+            If thisnode is a TAB, create a new row.
 
-            # Tratamento quando item.relocate = True
-            Checa se parent é uma row, se sim, verifica se há espaço
-            para incluir o item.
+            # Handling when item.relocate = True
+            Check if thisnode is a row, if yes, check if there is space
+            to include the item.
 
-            Se a row estiver com espaço lotado, verifica se há rows irmãos livre,
-            se sim, inclui o item, caso contrário, cria uma nova row.
+            If the row has full space, check if there are free sibling rows,
+            if yes, include the item, otherwise, create a new row.
 
-            Se parent for um TAB, busca em todos os filhos do tipo ROW se há espaço
-            para incluir o item. Se não encontrar, crua uma nova row.
+            If thisnode is a TAB, search all children of type ROW if there is space
+            to include the item. If you don't find it, create a new row.
 
         :param item:
-        :param parent:
+        :param thisnode:
         :return:
         """
-
-        if parent:
-            if parent.type_ == ItemPositionType.ROW:
-                free_space, total_width = self.have_free_space(parent, item)
+        logger.debug(f'This node {thisnode.item.id}({thisnode.type_})')
+        if thisnode:
+            if thisnode.type_ == ItemPositionType.ROW:
+                free_space, total_width = self.have_free_space(thisnode, item)
                 if free_space:
-                    return parent
+                    logger.debug(f'This node {thisnode.item.id}({thisnode.type_}) has space, return it.')
+                    return thisnode
 
                 if not item.relocate:
                     raise NodePositionValidationError(
                         f'There is not enough space for this component. Total {total_width} exceeds the maximum allowable width of {ItemPosition.MAX_WIDTH}.')
 
-                # Row está cheio.
-                # Busca se existe algum irmão com espaço
-                if parent.sibling:
-                    for node_irmao in parent.sibling:
-                        free_space, total_width = self.have_free_space(node_irmao, item)
+                # The line is full.
+                # Find out if there is a sibling with space
+                if thisnode.siblings:
+                    for node_brother in thisnode.siblings:
+                        free_space, total_width = self.have_free_space(node_brother, item)
                         if free_space:
-                            return node_irmao
+                            logger.debug(f'This node {thisnode.item.id}({thisnode.type_}) has no space. It has been verified that there is a sibling {node_brother.item.id}({node_brother.type_}) of it with free space, so return it.')
+                            return node_brother
 
-                # Não foi encontrado rows com espaço, então cria uma nova.
-                return self.get_new_node_position(RowItemPosition(), parent.parent)
-            elif parent.type_ == ItemPositionType.TAB:
-                if parent.children:
-                    for child in parent.children:
+                # No rows with space were found, so create a new row node.
+                logger.debug(f'There are no rows nodes with space. Creating a new row node and returning it.')
+                return self.get_new_node_position(RowItemPosition(), thisnode.parent)
+            elif thisnode.type_ == ItemPositionType.TAB:
+                if thisnode.children:
+                    for child in thisnode.children:
                         free_space, total_width = self.have_free_space(child, item)
                         if free_space:
+                            logger.debug(f'A child node {child.item.id}({child.type_}) of thisnode with space was found. Return it.')
                             return child
 
                     if not item.relocate:
                         raise NodePositionValidationError(
                             f'There is not enough space for this component. Total {total_width} exceeds the maximum allowable width of {ItemPosition.MAX_WIDTH}.')
 
-                # Aba não possui rows disponíveis, retornando uma nova
-                return self.get_new_node_position(RowItemPosition(), parent)
+                # TAB does not have rows available, returning a new row node.
+                logger.debug(f'This node {thisnode.item.id}({thisnode.type_}) does not have rows available, returning a new row node.')
+                return self.get_new_node_position(RowItemPosition(), thisnode)
+            elif thisnode.type_ == ItemPositionType.COLUMN:
+                return thisnode
+            #     free_space, total_width = self.have_free_space(thisnode, item)
+            #     if free_space:
+            #         logger.debug(f'This node {thisnode.item.id}({thisnode.type_}) has space, return it.')
+            #         return thisnode
+            #
+            #     if not item.relocate:
+            #         raise NodePositionValidationError(
+            #             'Node of type COLUMN can only have one child. Add the item to a new node of type COLUMN or pass the argument as relocate=True to create a new column dynamically.')
+            #     # thisnode already has a child.
+            #     # If thisnode has a child, it checks if there is space on the parent node.
+            #     # If yes, create a new column node sibling to thisnode and return this new node.
+            #     free_space, total_width = self.have_free_space(thisnode.parent, item)
+            #     if free_space:
+            #         logger.debug(f'This node {thisnode.item.id}({thisnode.type_}) already has a child. Verified that the parent node {thisnode.parent.item.id}({thisnode.parent.type_}) has space. Returning a new COLUMN node.')
+            #         return self.get_new_node_position(ColumnItemPosition(), thisnode.parent)
+            #     else:
+            #         # Parent of this node has no space.
+            #         # Return the next free ROW type node. If you can't find it, create a new one and return.
+            #         new_node_row = self._get_next_row_free(item, thisnode.parent)
+            #         new_node_column = self.get_new_node_position(ColumnItemPosition(), new_node_row)
+            #         logger.debug(f'This node {thisnode.item.id}({thisnode.type_}) has a child and its parent has no free space. A free ROW node {new_node_row.item.id}({new_node_row.type_}) was found and then a new node child {new_node_column.item.id}({new_node_column.type_} node was created. Returning this new child node.')
+            #         return new_node_column
             else:
-                return self.get_new_node_position(RowItemPosition(), parent)
+                logger.debug(f'Returning a new ROW node, child of this node {thisnode.item.id}({thisnode.type_}).')
+                return self.get_new_node_position(RowItemPosition(), thisnode)
 
     @classmethod
     def have_free_space(cls, row_node, item):
         total_width = item.width
-        for child in row_node.children:
-            total_width += child.item.width
-        if total_width <= ItemPosition.MAX_WIDTH:
+        try:
+            for child in row_node.children:
+                if hasattr(child.item, 'width'):
+                    total_width += child.item.width
+            if total_width <= ItemPosition.MAX_WIDTH:
+                return True, total_width
+            return False, total_width
+        except Exception as err:
+            msg = f"""Unexpected error. Unhandled exception.
+                err={err}
+                row_node={row_node}
+                item={item}
+            """
+            logger.warning(msg)
             return True, total_width
-        return False, total_width
 
     #Get the next brother free
     def _validate(self, item: ItemPosition):
+        try:
+            self.parent
+        except:
+            logger.warning(f'self not parent {self}?!'
+                           f'{self.__dict__}')
+            return
+
         if not hasattr(item, 'width') or self.parent is None:
             return
+
         total_width = item.width
-        for node_sibling in self.siblings:
-            total_width += node_sibling.item.width
-        if total_width > ItemPosition.MAX_WIDTH and not item.relocate:
-            raise NodePositionValidationError(
-                f'There is not enough space for this component. Total {total_width} exceeds the maximum allowable width of {MarkdownItemPosition.MAX_WIDTH}')
+        try:
+            for node_sibling in self.siblings:
+                total_width += node_sibling.item.width
+            if total_width > ItemPosition.MAX_WIDTH and not item.relocate:
+                raise NodePositionValidationError(
+                    f'There is not enough space for this component. Total {total_width} exceeds the maximum allowable width of {MarkdownItemPosition.MAX_WIDTH}')
+        except Exception as err:
+            msg = f"""Unexpected error. Unhandled exception.
+                    err={err}
+                    item={item}
+                """
+            logger.warning(msg)
 
 
 class MarkdownNodePosition(CheckFreeSpaceMixin, NodePosition):
@@ -297,11 +354,16 @@ class ChartNodePosition(CheckFreeSpaceMixin, NodePosition):
         super().__init__(item, parent)
 
 
+class ColumnNodePosition(NodePosition):
+    def __init__(self, item: ColumnItemPosition, parent: Self = None):
+        super().__init__(item, parent)
+
 class NodePositionParse:
     PARSE = {
         'ROOT': RootNodePosition,
         'GRID': GridNodePosition,
         'ROW': RowNodePosition,
+        'COLUMN': ColumnNodePosition,
         'TABS': TabsNodePosition,
         'TAB': TabNodePosition,
         'MARKDOWN': MarkdownNodePosition,

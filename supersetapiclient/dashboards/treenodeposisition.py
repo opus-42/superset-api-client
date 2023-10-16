@@ -4,9 +4,9 @@ from anytree import RenderTree, search
 from typing_extensions import Self
 
 from supersetapiclient.dashboards.itemposition import ItemPosition, RootItemPosition, \
-    GridItemPosition, ItemPositionType
-from supersetapiclient.dashboards.nodeposisition import NodePosition, TabNodePosition, \
-    MarkdownNodePosition, NodePositionParse, GridNodePosition, RootNodePosition
+    GridItemPosition
+from supersetapiclient.dashboards.nodeposisition import NodePosition, \
+    NodePositionParse, GridNodePosition, RootNodePosition
 
 
 class TreeNodePosition:
