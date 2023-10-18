@@ -1,11 +1,14 @@
+import logging
 from dataclasses import dataclass, field
-from typing import List, Optional, Union, Literal, get_args
+from typing import List, Union, Literal, get_args
 
-from supersetapiclient.base.base import Object
+from supersetapiclient.base.base import Object, ObjectField
 from supersetapiclient.charts.types import FilterOperatorType, TimeGrain, FilterExpressionType, SqlMapType, \
     GenericDataType, HorizontalAlignType, NumberFormatType, CurrentPositionType, CurrencyCodeType, MetricType
 from supersetapiclient.exceptions import ValidationError
-from supersetapiclient.typing import FilterValues
+from supersetapiclient.typing import FilterValues, Optional
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class CurrencyFormat(Object):
@@ -21,7 +24,7 @@ class ColumnConfig(Object):
     colorPositiveNegative: Optional[bool] = None
     showCellBars: Optional[bool] = None
     columnWidth: Optional[int] = None
-    currency_format: Optional[CurrencyFormat] = field(default_factory=CurrencyFormat)
+    currency_format: Optional[CurrencyFormat] = ObjectField(cls=CurrencyFormat, default_factory=CurrencyFormat)
 
 
 @dataclass
@@ -73,13 +76,12 @@ class AdhocMetric(Object):
     label: Optional[str]
     expressionType: FilterExpressionType = FilterExpressionType.CUSTOM_CQL
     sqlExpression: Optional[str] = None
-    column: Optional[AdhocMetricColumn] = field(default_factory=Column)
-    aggregate: MetricType = None
     hasCustomLabel: Optional[bool] = False
+    column: Optional[AdhocMetricColumn] = ObjectField(cls=AdhocMetricColumn, default=None)
+    aggregate: Optional[MetricType] = None
 
 Metric = Union[AdhocMetric, Literal['count', 'sum', 'avg', 'min', 'max', 'count distinct']]
 OrderBy = tuple[Metric, bool]
-
 
 class MetricMixin:
     def _get_metric(self, label: str,
@@ -95,14 +97,20 @@ class MetricMixin:
             aggregate = str(aggregate).upper()
 
         _metric = {
-            "label": label,
             "expressionType": str(expression_type),
-            "sqlExpression": sql_expression,
-            "column": column,
-            "aggregate": aggregate,
             "hasCustomLabel": True,
         }
+        if label:
+            _metric['label'] = label
+        if sql_expression:
+            _metric['sqlExpression'] = sql_expression
+        if column:
+            _metric['column'] = column
+        if aggregate:
+            _metric['aggregate'] = aggregate
+
         return AdhocMetric(**_metric)
+
 
     def _check_metric(self, value):
         simple_metrics = get_args(get_args(Metric)[-1])
@@ -150,16 +158,18 @@ class MetricMixin:
 
 @dataclass
 class QueryObject(Object, MetricMixin):
-    filters: List[QueryFilterClause] = field(default_factory=list)
-    extras: QuerieExtra = field(default_factory=QuerieExtra)
-    columns: Optional[list[Metric]] = None
-    metrics: Optional[list[Metric]] = None
-    #
     row_limit: Optional[int] = 0
     series_limit: Optional[int] = None
-    series_limit_metric: Optional[Metric] = None
+    series_limit_metric: Optional[Metric] = ObjectField(cls=AdhocMetric, default=None)
     order_desc: bool = True
     orderby: Optional[list[OrderBy]] = None
+
+    filters: List[QueryFilterClause] = ObjectField(cls=QueryFilterClause, default_factory=list)
+    extras: QuerieExtra = ObjectField(cls=QuerieExtra, default_factory=QuerieExtra)
+    columns: Optional[list[Metric]] =  ObjectField(cls=AdhocMetric, default=None)
+    metrics: Optional[list[Metric]] =  ObjectField(cls=AdhocMetric, default=None)
+    #
+
 
     def __post_init__(self):
         # if not self.metrics:

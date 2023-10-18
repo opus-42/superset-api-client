@@ -1,7 +1,9 @@
 import json
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
-from supersetapiclient.base.base import Object, default_string, json_field
+from typing import List, Dict
+from supersetapiclient.base.base import Object, default_string, ObjectField
+from supersetapiclient.typing import Optional
+
 
 @dataclass
 class CrossFilters(Object):
@@ -12,7 +14,7 @@ class CrossFilters(Object):
 @dataclass
 class ChartConfiguration(Object):
     id: int
-    crossFilters: CrossFilters = field(default_factory=CrossFilters)
+    crossFilters: CrossFilters = ObjectField(cls=ObjectField, default_factory=ObjectField)
 
 
 @dataclass
@@ -23,7 +25,7 @@ class GlobalChartconfigurationScope(Object):
 
 @dataclass
 class GlobalChartconfiguration(Object):
-    scope : GlobalChartconfigurationScope = field(default_factory=GlobalChartconfigurationScope)
+    scope : GlobalChartconfigurationScope = ObjectField(cls=GlobalChartconfigurationScope, default_factory=GlobalChartconfigurationScope)
     chartsInScope: List[str] = field(default_factory=list)
 
 
@@ -40,8 +42,8 @@ class Metadata(Object):
     timed_refresh_immune_slices: List[str] = field(default_factory=list)
     cross_filters_enabled: bool = field(default=False)
     filter_scopes: Optional[Dict] = field(default_factory=dict)
-    chart_configuration: Dict[str, ChartConfiguration] = field(default_factory=dict)
-    global_chart_configuration: GlobalChartconfiguration = field(default_factory=GlobalChartconfiguration)
+    chart_configuration: Dict[str, ChartConfiguration] = ObjectField(cls=ChartConfiguration, dict_right=True, default_factory=dict)
+    global_chart_configuration: GlobalChartconfiguration = ObjectField(cls=GlobalChartconfiguration, default_factory=GlobalChartconfiguration)
     default_filters: Dict = field(default_factory=dict)
 
     def add_chart(self, chart):

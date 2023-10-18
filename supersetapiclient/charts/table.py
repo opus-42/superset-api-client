@@ -1,11 +1,12 @@
 """Charts."""
+from supersetapiclient.base.base import ObjectField
 from supersetapiclient.charts.charts import Chart
 from supersetapiclient.charts.options import Option
 from supersetapiclient.charts.queries import AdhocMetric, Column, QueryObject, Metric, ColumnConfig, AdhocMetricColumn, \
     MetricMixin
 from supersetapiclient.charts.query_context import QueryContext
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
+from typing import List, Dict, Optional
 from supersetapiclient.charts.types import ChartType, DateFormatType, QueryModeType, TimeGrain, FilterExpressionType, \
     NumberFormatType, HorizontalAlignType, MetricType
 
@@ -30,14 +31,14 @@ class TableOption(Option):
     color_pn: bool = True
     allow_rearrange_columns: Optional[bool] = False
 
-    column_config: Optional[Dict[str,ColumnConfig]] = field(default_factory=dict)
+    column_config: Optional[Dict[str,ColumnConfig]] = ObjectField(cls=ColumnConfig, dict_right=True, default_factory=dict)
 
     conditional_formatting: Optional[List] = field(default_factory=list)
 
     ## percent_metrics: List = field(default_factory=list)
     ## all_columns: List = field(default_factory=list)
 
-    metrics: Optional[List[Metric]] = field(default_factory=list)
+    metrics: Optional[List[Metric]] = ObjectField(cls=AdhocMetric, default_factory=list)
     queryFields: Optional[Dict] = field(default_factory=dict)
 
     table_filter: Optional[bool] = False
@@ -67,7 +68,7 @@ class TableFormData(TableOption):
 
 @dataclass
 class TableQueryContext(QueryContext):
-    form_data: TableFormData = field(default_factory=TableFormData)
+    form_data: TableFormData = ObjectField(cls=TableFormData, default_factory=TableFormData)
 
 
 @dataclass
@@ -85,8 +86,8 @@ class TableQueryObject(QueryObject):
 @dataclass
 class TableChart(Chart):
     viz_type: ChartType = ChartType.TABLE
-    params: TableOption = field(default_factory=TableOption)
-    query_context: TableQueryContext = field(default_factory=TableQueryContext)
+    params: TableOption = ObjectField(cls=TableOption, default_factory=TableOption)
+    query_context: TableQueryContext = ObjectField(cls=TableQueryContext, default_factory=TableQueryContext)
 
     def add_custom_metric(self, label: str,
                            sql_expression: str = None,

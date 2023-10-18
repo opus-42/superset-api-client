@@ -1,8 +1,8 @@
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List
 
-from supersetapiclient.base.base import Object
+from supersetapiclient.base.base import Object, ObjectField
 from supersetapiclient.base.datasource import DataSource
 from supersetapiclient.charts.options import Option
 from supersetapiclient.charts.queries import QueryObject, AdhocMetricColumn
@@ -17,9 +17,9 @@ class FormData(Option):
 
 @dataclass
 class QueryContext(Object):
-    datasource: DataSource = field(default_factory=DataSource)
-    queries: List[QueryObject] = field(default_factory=list)
-    form_data: FormData = field(default_factory=FormData)
+    datasource: DataSource = ObjectField(cls=DataSource, default_factory=DataSource)
+    queries: List[QueryObject] = ObjectField(cls=QueryObject, default_factory=list)
+    form_data: FormData = ObjectField(cls=FormData, default_factory=FormData)
 
     def add_dashboard(self, dashboard_id):
         self.form_data.add_dashboard(dashboard_id)

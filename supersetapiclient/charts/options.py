@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
-from supersetapiclient.base.base import Object
+from supersetapiclient.base.base import Object, ObjectField
 from supersetapiclient.charts.filters import AdhocFilterClause
-from supersetapiclient.charts.queries import OrderBy, MetricMixin, AdhocMetricColumn
+from supersetapiclient.charts.queries import OrderBy, MetricMixin, AdhocMetric
 from supersetapiclient.charts.types import ChartType, FilterOperatorType, FilterClausesType, \
     FilterExpressionType
 
@@ -17,9 +17,9 @@ class Option(Object, MetricMixin):
     extra_form_data: Dict = field(default_factory=dict)
     row_limit: int = 100
 
-    adhoc_filters: List[AdhocFilterClause] = field(default_factory=list)
+    adhoc_filters: List[AdhocFilterClause] =  ObjectField(cls=AdhocFilterClause, default_factory=list)
     dashboards: List[int] = field(default_factory=list)
-    groupby: Optional[List[OrderBy]] = field(default_factory=list)
+    groupby: Optional[List[OrderBy]] = ObjectField(cls=AdhocMetric, default_factory=list)
 
     def add_dashboard(self, dashboard_id):
         dashboards = set(self.dashboards)

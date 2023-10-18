@@ -2,11 +2,12 @@
 import dataclasses
 import logging
 from abc import abstractmethod
+from contextlib import suppress
 from enum import Enum
 from typing_extensions import Self
 from supersetapiclient.base.parse import ParseMixin
 from supersetapiclient.client import QueryStringFilter
-from supersetapiclient.typing import NotToJson
+from supersetapiclient.typing import NotToJson, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +20,30 @@ except ImportError:  # pragma: no cover
 import json
 import os.path
 from pathlib import Path
-from typing import List, Union, Dict, get_args, get_origin, Any, Literal
+from typing import List, Union, Dict, get_args, get_origin, Any, Literal, MutableMapping
 
 import yaml
 from requests import HTTPError
 
 from supersetapiclient.exceptions import BadRequestError, ComplexBadRequestError, MultipleFound, NotFound, \
     LoadJsonError, ValidationError
+
+
+class ObjectField(dataclasses.Field):
+    def __init__(self, cls, dict_left:bool=False, dict_right:bool=False, *args, **kwargs):
+        kwargs['default'] = kwargs.get('default', dataclasses.MISSING)
+        kwargs['default_factory'] = kwargs.get('default_factory', dataclasses.MISSING)
+        kwargs['init'] = kwargs.get('init', True)
+        kwargs['repr'] = kwargs.get('repr', True)
+        kwargs['compare'] = kwargs.get('compare', True)
+        kwargs['metadata'] = kwargs.get('metadata', None)
+        kwargs['hash'] = kwargs.get('hash', None)
+        super().__init__(*args, **kwargs)
+
+        self.cls = cls
+        self.dict_left = dict_left
+        self.dict_right = dict_right
+
 
 class ObjectDecoder(json.JSONEncoder):
     def default(self, obj):
@@ -140,53 +158,12 @@ class Object(ParseMixin):
         return extra_fields
 
     @classmethod
-    def _issubclass_object(cls, type_):
-        try:
-            if issubclass(type_, Object):
-                return True
-        except:
-            pass
-        return False
-
-    @classmethod
-    def _subclass_object(cls, field_name:str):
-        field = cls.get_field(field_name)
-        ObjectClass = field.type
-        logger.debug(f'field_name: {field_name}; field.type: {field.type}')
-        type_ = None
-        while get_origin(ObjectClass):
-            if get_args(ObjectClass):
-                if len(get_args(ObjectClass)) == 2:
-                    type_, ObjectClass = get_args(ObjectClass)
-                    if 'NoneType' in str(ObjectClass):
-                        if get_args(type_) and len(get_args(type_)) > 1:
-                            type_, ObjectClass = get_args(type_)
-                            logger.debug(f'while get_origin(ObjectClass) > if get_args(ObjectClass) > if len(get_args(ObjectClass)) == 2 > if "NoneType" in str(ObjectClass)')
-                            logger.debug(f'type_: {type_}, ObjectClass: {ObjectClass}')
-                        else:
-                            ObjectClass = get_args(type_) or None
-                            logger.debug(f'while get_origin(ObjectClass) > if get_args(ObjectClass) > if len(get_args(ObjectClass)) == 2 > else if "NoneType" in str(ObjectClass)')
-                            logger.debug(f'ObjectClass: {ObjectClass}')
-                else:
-                    if get_origin(ObjectClass) is Literal:
-                        ObjectClass = None
-                        logger.debug(f'while get_origin(ObjectClass) > if get_args(ObjectClass) > else if len(get_args(ObjectClass)) == 2 > if get_origin(ObjectClass) is Literal')
-                    else:
-                        logger.debug(f'while get_origin(ObjectClass) > if get_args(ObjectClass) > else if len(get_args(ObjectClass)) == 2 > else if get_origin(ObjectClass) is Literal')
-                        ObjectClass = get_args(ObjectClass)[-1]
-                    logger.debug(f'ObjectClass: {ObjectClass}')
-            else:
-                break
-
-        if 'NoneType' in str(ObjectClass):
-            ObjectClass = None
-        if 'NoneType' in str(type_):
-            type_ = None
-        if cls._issubclass_object(ObjectClass):
-            return type_, ObjectClass
-        elif cls._issubclass_object(type_):
-            return ObjectClass, type_
-        return type_, None
+    def _subclass_object(cls, field: dataclasses.Field, data:Any=None):
+        if hasattr(field, 'cls'):
+            if data and not isinstance(data, Object):
+                return None
+            return field.cls
+        return None
 
     @classmethod
     def from_json(cls, data: dict) -> Self:
@@ -216,9 +193,10 @@ class Object(ParseMixin):
                 if field_name in cls.JSON_FIELDS:
                     continue
                 if isinstance(data_value, dict):
-                    type_, ObjectClass = cls._subclass_object(field_name)
+                    field = cls.get_field(field_name)
+                    ObjectClass = cls._subclass_object(field, data_value)
                     value = None
-                    if type_ and ObjectClass:
+                    if ObjectClass and field.dict_right:
                         value = {}
                         for k, field_value in data_value.items():
                             value[k] = ObjectClass.from_json(field_value)
@@ -228,7 +206,8 @@ class Object(ParseMixin):
                         value = data_value
                     setattr(obj, field_name, value)
                 elif isinstance(data_value, list):
-                    type_, ObjectClass = cls._subclass_object(field_name)
+                    field = cls.get_field(field_name)
+                    ObjectClass = cls._subclass_object(field, data_value)
                     if ObjectClass is None:
                         value = data_value
                     else:
@@ -252,33 +231,43 @@ class Object(ParseMixin):
             raise LoadJsonError(err)
         return obj
 
-    def __remove_fields_Optional_or_NotToJson(self, data:dict):
-        def remove(data:dict, field: dataclasses.Field):
+    @classmethod
+    def remove_exclude_keys(cls, data, parent_field_name=''):
+        def is_exclude(field_name, parent_field):
+            field = cls.get_field(field_name)
+            _is_exclude = False
             try:
-                data.pop(field.name)
-            except KeyError:
-                pass
-
-        for field in self.fields():
-            try:
-                if get_origin(field.type) is Union and 'typing.Optional' in str(field.type):
-                    if field.default is dataclasses.MISSING:
-                        remove(data, field)
+                if not field and parent_field:
+                    ObjectClass = cls._subclass_object(parent_field)
+                    field = ObjectClass.get_field(field_name)
+                if get_origin(field.type) is Optional:
+                    if not data[field.name] and field.default is dataclasses.MISSING:
+                        _is_exclude = True
                     elif field.default == data[field.name]:
-                        remove(data, field)
+                        _is_exclude = True
                     else:
-                        logger.warning('untreated else condition')
+                        _is_exclude = False
                 if get_origin(field.type) is NotToJson:
-                    remove(data, field)
-            except AttributeError:
+                    _is_exclude = True
+            except Exception:
                 pass
-        return data
+            return _is_exclude
 
-    def __remove_field_starting_shyphen(self, data):
-        fields = list(data.keys())
-        for field in fields:
-            if fields[0] == "_":
-                data.pop(field)
+        if isinstance(data, list):
+            # Se for uma lista, aplicamos a função a cada elemento da lista
+            newdata = []
+            for item in data:
+                if not is_exclude(parent_field_name, parent_field_name):
+                    newdata.append(cls.remove_exclude_keys(item, parent_field_name))
+            return newdata
+        if isinstance(data, dict):
+            # Se for um dicionário, percorremos suas chaves e valores
+            return {
+                key: cls.remove_exclude_keys(value, key) for key, value in data.items()
+                if not is_exclude(key, cls.get_field(parent_field_name))
+            }
+        # Se não for lista nem dicionário, retornamos o valor como está
+        return data
 
     def to_dict(self, columns=[]) -> dict:
         columns_names = set(columns or [])
@@ -302,22 +291,23 @@ class Object(ParseMixin):
                         values_data.append(field_value)
                     value = values_data
             if value and isinstance(value, dict):
-                ProbableObjectClass1, ProbableObjectClass2 = self._subclass_object(c)
-                if ProbableObjectClass1 and ProbableObjectClass2:
+                field = self.get_field(c)
+                ObjectClass = self._subclass_object(field, value)
+                if ObjectClass:
                     _value = {}
-                    if self._issubclass_object(ProbableObjectClass1):
-                        for ojb, value_ in value.items():
+                    if field.dict_left:
+                        for obj, value_ in value.items():
                             _value[obj.to_dict()] = value_
-                    elif self._issubclass_object(ProbableObjectClass2):
+                    elif field.dict_right:
                         for k, obj in value.items():
                             _value[k] =  obj.to_dict()
                     else:
+                        breakpoint()
                         msg = f"""self={self}
                             field_name={c}
                             data_value={value}
                             data={data}
-                            ProbableObjectClass1={ProbableObjectClass1}
-                            ProbableObjectClass2={ProbableObjectClass2}
+                            ObjectClass={ObjectClass}
                         """
                         logger.error(msg)
                         raise ValidationError('Unable to determine ObjectClass')
@@ -337,14 +327,13 @@ class Object(ParseMixin):
             elif isinstance(obj, dict):
                 data[field] = json.dumps(data[field], cls=ObjectDecoder)
 
-        self.__remove_field_starting_shyphen(data)
 
-        self.__remove_fields_Optional_or_NotToJson(data)
+        copydata = self.remove_exclude_keys(data)
 
-        if data.get('extra_fields'):
-            data.pop('extra_fields')
-        logger.info(f'return data {data}')
-        return data
+        if copydata.get('extra_fields'):
+            copydata.pop('extra_fields')
+        logger.info(f'return data {copydata}')
+        return copydata
 
     @property
     def base_url(self) -> str:
@@ -491,7 +480,6 @@ class ObjectFactories:
 
     def add(self, obj) -> int:
         """Create an object on remote."""
-
         o = obj.to_json(columns=self.add_columns)
         logger.info(f'payload: {o}')
 

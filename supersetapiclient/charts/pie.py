@@ -1,14 +1,14 @@
 """Charts."""
 from supersetapiclient.charts.charts import Chart
 from supersetapiclient.charts.options import Option
-from supersetapiclient.charts.queries import Metric, CurrencyFormat, MetricMixin, AdhocMetricColumn
+from supersetapiclient.charts.queries import Metric, CurrencyFormat, MetricMixin, AdhocMetricColumn, AdhocMetric
 from supersetapiclient.charts.query_context import QueryContext
 from dataclasses import dataclass, field
-from typing import Optional
-from supersetapiclient.base.base import default_string
+from supersetapiclient.base.base import default_string, ObjectField
 from supersetapiclient.charts.types import ChartType, LabelType, LegendOrientationType, LegendType, DateFormatType, \
     NumberFormatType, MetricType
 from supersetapiclient.exceptions import ValidationError
+from supersetapiclient.typing import Optional
 
 
 @dataclass
@@ -21,7 +21,7 @@ class PieOption(Option):
     show_legend: bool = True
     show_labels: bool = True
     legendMargin: Optional[int] = None
-    currency_format: Optional[CurrencyFormat] = field(default_factory=CurrencyFormat)
+    currency_format: Optional[CurrencyFormat] = ObjectField(cls=CurrencyFormat, default_factory=CurrencyFormat)
     number_format: NumberFormatType = NumberFormatType.SMART_NUMBER
     date_format: DateFormatType = DateFormatType.SMART_DATE
     donut: Optional[bool] = False
@@ -31,7 +31,7 @@ class PieOption(Option):
     innerRadius: int = 30
     outerRadius: int = 70
     show_labels_threshold: int = 5
-    metric: Metric = None
+    metric: Metric = ObjectField(AdhocMetric, default=None)
     sort_by_metric: bool = True
 
 
@@ -78,7 +78,7 @@ class PieFormData(PieOption):
 
 @dataclass
 class PieQueryContext(QueryContext):
-    form_data: PieFormData = field(default_factory=PieFormData)
+    form_data: PieFormData = ObjectField(cls=PieFormData, default_factory=PieFormData)
     # self.queries[0]
     # self.queries[0].metrics
     def validate(self, data: dict):
@@ -104,5 +104,5 @@ class PieQueryContext(QueryContext):
 @dataclass
 class PieChart(Chart):
     viz_type: ChartType = ChartType.PIE
-    params: PieOption = field(default_factory=PieOption)
-    query_context: PieQueryContext = field(default_factory=PieQueryContext)
+    params: PieOption =  ObjectField(cls=PieOption, default_factory=PieOption)
+    query_context: PieQueryContext =  ObjectField(cls=PieQueryContext, default_factory=PieQueryContext)

@@ -2,10 +2,10 @@
 import copy
 import json
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import List
 from typing_extensions import Self
 
-from supersetapiclient.base.base import Object, ObjectFactories, default_string, raise_for_status
+from supersetapiclient.base.base import Object, ObjectFactories, default_string, raise_for_status, ObjectField
 from supersetapiclient.base.types import DatasourceType
 from supersetapiclient.charts.filters import AdhocFilterClause
 from supersetapiclient.charts.options import Option
@@ -17,7 +17,7 @@ from supersetapiclient.charts.types import ChartType, FilterOperatorType, Filter
 from supersetapiclient.dashboards.dashboards import Dashboard
 from supersetapiclient.dashboards.itemposition import ItemPosition
 from supersetapiclient.exceptions import NotFound, ChartValidationError
-from supersetapiclient.typing import NotToJson
+from supersetapiclient.typing import NotToJson, Optional
 
 
 @dataclass
@@ -36,10 +36,10 @@ class Chart(Object):
     cache_timeout: NotToJson[int] = field(default=None)
 
     params: Option = field(default_factory=Option)
-    query_context: QueryContext = field(default_factory=QueryContext)
+    query_context: QueryContext = ObjectField(cls=QueryContext, default_factory=QueryContext)
 
     datasource_type: DatasourceType = DatasourceType.TABLE
-    dashboards: List[Dashboard] = field(default_factory=list)
+    dashboards: List[Dashboard] = ObjectField(cls=Dashboard, default_factory=list)
 
     _slice_name_override: NotToJson[str] = default_string()
 
@@ -138,7 +138,6 @@ class Chart(Object):
                             aggregate: MetricType = None):
         self.params._add_custom_groupby(label, sql_expression, column, aggregate)
         self.query_context._add_custom_groupby(label, sql_expression, column, aggregate)
-
 
     def add_simple_filter(self, column_name: str,
                           value: str,

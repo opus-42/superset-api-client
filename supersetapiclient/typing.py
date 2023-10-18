@@ -1,10 +1,16 @@
 from datetime import datetime
-from typing import Any, Literal, Optional, TYPE_CHECKING, Union, Generic, TypeVar
-
-from typing_extensions import NotRequired, TypedDict
+from typing import Union, Generic, TypeVar
 
 T = TypeVar('T')
 class NotToJson(Generic[T]):
+    def __init__(self, value: T):
+        self.value = value
+
+    def get(self) -> T:
+        return self.value
+
+
+class Optional(Generic[T]):
     def __init__(self, value: T):
         self.value = value
 
