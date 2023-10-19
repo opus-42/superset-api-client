@@ -22,4 +22,5 @@ class AdhocFilterClause(Object):
     isNew: bool = False
 
     def __post_init__(self):
+        super().__post_init__()
         self.operatorId = str(self.operator)

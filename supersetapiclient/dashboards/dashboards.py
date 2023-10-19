@@ -8,7 +8,7 @@ from supersetapiclient.dashboards.metadata import Metadata
 from supersetapiclient.dashboards.metadataposition import Metadataposition
 from supersetapiclient.dashboards.nodeposisition import RowNodePosition
 from supersetapiclient.exceptions import DashboardValidationError
-from supersetapiclient.typing import NotToJson
+from supersetapiclient.typing import NotToJson, Optional
 
 
 def defult_metadata():
@@ -33,6 +33,7 @@ class Dashboard(Object):
     # charts: List[Chart] = field(default_factory=Chart)
 
     def __post_init__(self):
+        super().__post_init__()
         self._charts_slice_names = []
 
     @classmethod
@@ -104,7 +105,6 @@ class Dashboard(Object):
         deleted = self._factory.delete(id=self.id)
         if deleted and exclude_charts:
             for chart in self.get_charts():
-                breakpoint()
                 chart.delete()
 
 

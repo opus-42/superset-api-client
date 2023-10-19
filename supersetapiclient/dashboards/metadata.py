@@ -14,7 +14,7 @@ class CrossFilters(Object):
 @dataclass
 class ChartConfiguration(Object):
     id: int
-    crossFilters: CrossFilters = ObjectField(cls=ObjectField, default_factory=ObjectField)
+    crossFilters: CrossFilters = ObjectField(cls=CrossFilters, default_factory=CrossFilters)
 
 
 @dataclass

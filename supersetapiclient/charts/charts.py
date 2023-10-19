@@ -44,6 +44,7 @@ class Chart(Object):
     _slice_name_override: NotToJson[str] = default_string()
 
     def __post_init__(self):
+        super().__post_init__()
         from supersetapiclient.dashboards.dashboards import Dashboard
         self._dashboards = [Dashboard(dashboard_title='')]
 
@@ -118,14 +119,13 @@ class Chart(Object):
 
 
     def add_custom_metric(self, label: str,
-                           sql_expression: str = None,
-                           column: AdhocMetricColumn = None,
-                           aggregate: MetricType = None):
-
+                            column: AdhocMetricColumn = None,
+                            sql_expression: str = None,
+                            aggregate: MetricType = None):
         if column:
             column.id = self.id
-        self.params._add_custom_metric(label, sql_expression, column, aggregate)
-        self.query_context._add_custom_metric(label, sql_expression, column, aggregate)
+        self.params._add_custom_metric(label, column, sql_expression, aggregate)
+        self.query_context._add_custom_metric(label, column, sql_expression, aggregate)
 
 
     def add_simple_groupby(self, column_name: str):
@@ -133,11 +133,11 @@ class Chart(Object):
         self.query_context._add_simple_groupby(column_name)
 
     def add_custom_groupby(self, label: str,
-                            sql_expression: str = None,
                             column: AdhocMetricColumn = None,
+                            sql_expression: str = None,
                             aggregate: MetricType = None):
-        self.params._add_custom_groupby(label, sql_expression, column, aggregate)
-        self.query_context._add_custom_groupby(label, sql_expression, column, aggregate)
+        self.params._add_custom_groupby(label, column, sql_expression, aggregate)
+        self.query_context._add_custom_groupby(label, column, sql_expression, aggregate)
 
     def add_simple_filter(self, column_name: str,
                           value: str,
@@ -145,8 +145,6 @@ class Chart(Object):
                           clause: FilterClausesType = FilterClausesType.WHERE) -> None:
         self.params._add_simple_filter(column_name, value, operator, clause)
         self.query_context._add_simple_filter(column_name, value, operator, clause)
-
-
 
     def to_json(self, columns=None):
         data = super().to_json(columns).copy()
@@ -163,10 +161,11 @@ class Chart(Object):
         obj._dashboards = obj.dashboards
 
         # set default datasource
-        datasource = obj.query_context.datasource
-        if datasource:
-            obj.datasource_id = datasource.id
-            obj.datasource_type = datasource.type
+        if obj.query_context:
+            datasource = obj.query_context.datasource
+            if datasource:
+                obj.datasource_id = datasource.id
+                obj.datasource_type = datasource.type
 
         return obj
 

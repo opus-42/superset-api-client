@@ -61,7 +61,6 @@ def json_field(**kwargs):
 def default_string(**kwargs):
     if not kwargs.get('default'):
         kwargs['default']=''
-
     return dataclasses.field(repr=False, **kwargs)
 
 def default_bool(**kwargs):
@@ -97,10 +96,17 @@ class Object(ParseMixin):
             if isinstance(value, str):
                 setattr(self, f, json.loads(value))
 
+        # Loop through the fields
+        for field in self.fields():
+            # If there is a default and the value of the field is none we can assign a value
+            if not isinstance(field.default, dataclasses._MISSING_TYPE) \
+                    and getattr(self, field.name) is None \
+                    and not get_origin(field.type) is Optional:
+                        setattr(self, field.name, field.default)
+
     @abstractmethod
     def validate(self, data: dict):
         pass
-
 
     @property
     def extra_fields(self):
@@ -143,7 +149,7 @@ class Object(ParseMixin):
         return rdata
 
     @classmethod
-    def __get_extra_fields(cls, data) -> dict:
+    def __get_extra_fields(cls, data:dict) -> dict:
         if not data:
             return {}
 
@@ -158,10 +164,8 @@ class Object(ParseMixin):
         return extra_fields
 
     @classmethod
-    def _subclass_object(cls, field: dataclasses.Field, data:Any=None):
+    def _subclass_object(cls, field: dataclasses.Field):
         if hasattr(field, 'cls'):
-            if data and not isinstance(data, Object):
-                return None
             return field.cls
         return None
 
@@ -171,21 +175,21 @@ class Object(ParseMixin):
         field_name = None
         data_value = None
         try:
+            # if not isinstance(data, dict):
+            #     return data
+
             obj = cls(**data)
 
             for field_name in cls.JSON_FIELDS:
                 data_value = data.get(field_name)
                 if isinstance(data_value, str):
                     field = cls.get_field(field_name)
-                    if get_origin(field.type) is Union:
-                        ObjectClass = get_args(field.type)[0]
-                    else:
-                        ObjectClass = field.type
-
-                    if ObjectClass is Dict:
-                        value = json.loads(data_value)
-                    else:
+                    ObjectClass = cls._subclass_object(field)
+                    if ObjectClass:
                         value = ObjectClass.from_json(json.loads(data[field_name]))
+                    else:
+                        value = json.loads(data[field_name])
+
                     setattr(obj, field_name, value)
 
             for field_name, data_value in data.items():
@@ -194,7 +198,7 @@ class Object(ParseMixin):
                     continue
                 if isinstance(data_value, dict):
                     field = cls.get_field(field_name)
-                    ObjectClass = cls._subclass_object(field, data_value)
+                    ObjectClass = cls._subclass_object(field)
                     value = None
                     if ObjectClass and field.dict_right:
                         value = {}
@@ -207,13 +211,17 @@ class Object(ParseMixin):
                     setattr(obj, field_name, value)
                 elif isinstance(data_value, list):
                     field = cls.get_field(field_name)
-                    ObjectClass = cls._subclass_object(field, data_value)
-                    if ObjectClass is None:
-                        value = data_value
-                    else:
-                        value = []
-                        for field_data_value in data_value:
-                            value.append(ObjectClass.from_json(field_data_value))
+                    ObjectClass = cls._subclass_object(field)
+                    value = []
+                    for field_data_value in data_value:
+                        if ObjectClass and isinstance(data_value, dict):
+                            try:
+                                value.append(ObjectClass.from_json(field_data_value))
+                            except:
+                                breakpoint()
+                        else:
+                            value.append(field_data_value)
+
                     setattr(obj, field_name, value)
                 else:
                     setattr(obj, field_name, data_value)
@@ -233,7 +241,7 @@ class Object(ParseMixin):
 
     @classmethod
     def remove_exclude_keys(cls, data, parent_field_name=''):
-        def is_exclude(field_name, parent_field):
+        def is_exclude(field_name, parent_field, data):
             field = cls.get_field(field_name)
             _is_exclude = False
             try:
@@ -257,19 +265,31 @@ class Object(ParseMixin):
             # Se for uma lista, aplicamos a função a cada elemento da lista
             newdata = []
             for item in data:
-                if not is_exclude(parent_field_name, parent_field_name):
+                if not is_exclude(parent_field_name, parent_field_name, data):
                     newdata.append(cls.remove_exclude_keys(item, parent_field_name))
             return newdata
         if isinstance(data, dict):
             # Se for um dicionário, percorremos suas chaves e valores
             return {
                 key: cls.remove_exclude_keys(value, key) for key, value in data.items()
-                if not is_exclude(key, cls.get_field(parent_field_name))
+                if not is_exclude(key, cls.get_field(parent_field_name), data)
             }
         # Se não for lista nem dicionário, retornamos o valor como está
         return data
 
     def to_dict(self, columns=[]) -> dict:
+        def prepare_value_tuple(field_value):
+            values_data = []
+            if isinstance(field_value, tuple):
+                l1 = field_value[0]
+                l2 = field_value[1]
+                if isinstance(field_value[0], Object):
+                    l1 = field_value[0].to_dict()
+                elif isinstance(field_value[1], Object):
+                    l2 = field_value[1].to_dict()
+                values_data.append((l1, l2))
+            return values_data
+
         columns_names = set(columns or [])
         columns_names.update(self.field_names())
         data = {}
@@ -280,19 +300,21 @@ class Object(ParseMixin):
             value = getattr(self, c)
             if isinstance(value, Enum):
                 value = str(value)
-            if value and isinstance(value, Object):
+            elif value and isinstance(value, Object):
                 value = value.to_dict(columns)
             elif value and isinstance(value, list):
                 values_data = []
                 for field_value in value:
                     if isinstance(field_value, Object):
-                        values_data.append(field_value.to_dict(columns))
+                        values_data.append(field_value.to_dict())
+                    elif isinstance(field_value, tuple):
+                        values_data = prepare_value_tuple(field_value)
                     else:
                         values_data.append(field_value)
                     value = values_data
-            if value and isinstance(value, dict):
+            elif value and isinstance(value, dict):
                 field = self.get_field(c)
-                ObjectClass = self._subclass_object(field, value)
+                ObjectClass = self._subclass_object(field)
                 if ObjectClass:
                     _value = {}
                     if field.dict_left:
@@ -301,19 +323,11 @@ class Object(ParseMixin):
                     elif field.dict_right:
                         for k, obj in value.items():
                             _value[k] =  obj.to_dict()
-                    else:
-                        breakpoint()
-                        msg = f"""self={self}
-                            field_name={c}
-                            data_value={value}
-                            data={data}
-                            ObjectClass={ObjectClass}
-                        """
-                        logger.error(msg)
-                        raise ValidationError('Unable to determine ObjectClass')
-                    value = _value
+                value = _value
+            elif value and isinstance(value, tuple):
+                value = prepare_value_tuple(field_value)
             data[c] = value
-            logger.info(f'return data {data}')
+            # logger.debug(f'return data {data}')
         return data
 
     def to_json(self, columns=[]) -> dict:
@@ -327,12 +341,11 @@ class Object(ParseMixin):
             elif isinstance(obj, dict):
                 data[field] = json.dumps(data[field], cls=ObjectDecoder)
 
-
         copydata = self.remove_exclude_keys(data)
 
         if copydata.get('extra_fields'):
             copydata.pop('extra_fields')
-        logger.info(f'return data {copydata}')
+        logger.debug(f'return data {copydata}')
         return copydata
 
     @property
@@ -380,7 +393,6 @@ class ObjectFactories:
     base_object: Object = None
 
     _INFO_QUERY = {"keys": ["add_columns", "edit_columns"]}
-
 
     def __init__(self, client):
         """Create a new Dashboards endpoint.
@@ -441,7 +453,8 @@ class ObjectFactories:
         logger.info(f'response: {result}')
 
         data_result = result['result']
-        result["id"] = id
+
+        data_result["id"] = result.get('id', data_result.get('id', id))
         BaseClass = self.get_base_object(data_result)
 
         object = BaseClass.from_json(data_result)
