@@ -9,15 +9,16 @@ from supersetapiclient.base.base import Object, ObjectFactories, default_string,
 from supersetapiclient.base.types import DatasourceType
 from supersetapiclient.charts.filters import AdhocFilterClause
 from supersetapiclient.charts.options import Option
-from supersetapiclient.charts.queries import QueryFilterClause, QueryObject, Column, AdhocMetricColumn
+from supersetapiclient.charts.queries import QueryFilterClause, QueryObject, Column, AdhocMetricColumn, OrderBy
 
 from supersetapiclient.charts.query_context import QueryContext, DataSource
 from supersetapiclient.charts.types import ChartType, FilterOperatorType, FilterClausesType, FilterExpressionType, \
     MetricType, MetricType
 from supersetapiclient.dashboards.dashboards import Dashboard
 from supersetapiclient.dashboards.itemposition import ItemPosition
-from supersetapiclient.exceptions import NotFound, ChartValidationError
+from supersetapiclient.exceptions import NotFound, ChartValidationError, ValidationError
 from supersetapiclient.typing import NotToJson, Optional
+from supersetapiclient.utils import dict_compare
 
 
 @dataclass
@@ -62,9 +63,11 @@ class Chart(Object):
                 self.query_context.form_data = self.params.datasource
 
     def validate(self, data: dict):
-        pass
-        # TODO: validar se métrica e dimensão (groupby) consta em self.param, self.query_context.form_data
-        # self.query_context.queries
+        super().validate(data)
+        if self.params != self.query_context.form_data:
+            added, removed, modified, same = dict_compare(self.params.to_dict(), self.query_context.form_data.to_dict())
+            raise ValidationError(message=f'self.params is not the same as self.query_conext.form_data. Diff: {modified}',
+                                  solution="We recommend using the public methods of the chart class.")
 
     @classmethod
     def instance(cls,
@@ -110,38 +113,48 @@ class Chart(Object):
         self.params.adhoc_filters = []
         for query in self.query_context.queries:
             query.filters = []
-
         self.query_context.form_data.adhoc_filters = []
 
-    def add_simple_metric(self, metric: MetricType, order: bool):
-        self.params._add_simple_metric(metric, order)
-        self.query_context._add_simple_metric(metric, order)
-
+    def add_simple_metric(self, metric: MetricType, automatic_order: OrderBy = OrderBy()):
+        self.params._add_simple_metric(metric, automatic_order)
+        self.query_context._add_simple_metric(metric, automatic_order)
 
     def add_custom_metric(self, label: str,
-                            column: AdhocMetricColumn = None,
-                            sql_expression: str = None,
-                            aggregate: MetricType = None):
+                          automatic_order: OrderBy = OrderBy(),
+                          column: AdhocMetricColumn = None,
+                          sql_expression: str = None,
+                          aggregate: MetricType = None):
         if column:
             column.id = self.id
-        self.params._add_custom_metric(label, column, sql_expression, aggregate)
-        self.query_context._add_custom_metric(label, column, sql_expression, aggregate)
+
+        self.params._add_custom_metric(label, automatic_order, column, sql_expression, aggregate)
+        self.query_context._add_custom_metric(label, automatic_order, column, sql_expression, aggregate)
 
 
-    def add_simple_groupby(self, column_name: str):
+    def add_simple_orderby(self, column_name: str,
+                            sort_ascending: bool = True):
+        self.query_context._add_simple_orderby(column_name, sort_ascending)
+
+    def add_custom_orderby(self, label: str,
+                             column: AdhocMetricColumn = None,
+                             sql_expression: str = None,
+                             aggregate: MetricType = None):
+        self.query_context._add_custom_orderby(label, column, sql_expression, aggregate)
+
+    def add_simple_dimension(self, column_name: str):
         self.params._add_simple_groupby(column_name)
         self.query_context._add_simple_groupby(column_name)
 
-    def add_custom_groupby(self, label: str,
-                            column: AdhocMetricColumn = None,
-                            sql_expression: str = None,
-                            aggregate: MetricType = None):
+    def add_custom_dimension(self, label: str,
+                             column: AdhocMetricColumn = None,
+                             sql_expression: str = None,
+                             aggregate: MetricType = None):
         self.params._add_custom_groupby(label, column, sql_expression, aggregate)
         self.query_context._add_custom_groupby(label, column, sql_expression, aggregate)
 
     def add_simple_filter(self, column_name: str,
                           value: str,
-                          operator: FilterOperatorType = FilterOperatorType.EQUAL,
+                          operator: FilterOperatorType = FilterOperatorType.EQUALS,
                           clause: FilterClausesType = FilterClausesType.WHERE) -> None:
         self.params._add_simple_filter(column_name, value, operator, clause)
         self.query_context._add_simple_filter(column_name, value, operator, clause)

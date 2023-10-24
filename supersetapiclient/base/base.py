@@ -218,7 +218,7 @@ class Object(ParseMixin):
                             try:
                                 value.append(ObjectClass.from_json(field_data_value))
                             except:
-                                breakpoint()
+                               logger.warning(f'unhandled exception, check. field_data_value: {field_data_value}')
                         else:
                             value.append(field_data_value)
 
@@ -262,19 +262,19 @@ class Object(ParseMixin):
             return _is_exclude
 
         if isinstance(data, list):
-            # Se for uma lista, aplicamos a função a cada elemento da lista
+            # If it is a list, we apply the function to each element in the list
             newdata = []
             for item in data:
                 if not is_exclude(parent_field_name, parent_field_name, data):
                     newdata.append(cls.remove_exclude_keys(item, parent_field_name))
             return newdata
         if isinstance(data, dict):
-            # Se for um dicionário, percorremos suas chaves e valores
+            # If it's a dictionary, we loop through its keys and values
             return {
                 key: cls.remove_exclude_keys(value, key) for key, value in data.items()
                 if not is_exclude(key, cls.get_field(parent_field_name), data)
             }
-        # Se não for lista nem dicionário, retornamos o valor como está
+        # If it is neither a list nor a dictionary, we return the value as is
         return data
 
     def to_dict(self, columns=[]) -> dict:
@@ -287,6 +287,10 @@ class Object(ParseMixin):
                     l1 = field_value[0].to_dict()
                 elif isinstance(field_value[1], Object):
                     l2 = field_value[1].to_dict()
+                elif isinstance(field_value[0], Enum):
+                    l1 = str(field_value[0])
+                elif isinstance(field_value[1], Enum):
+                    l2 = str(field_value[0])
                 values_data.append((l1, l2))
             return values_data
 
@@ -309,6 +313,8 @@ class Object(ParseMixin):
                         values_data.append(field_value.to_dict())
                     elif isinstance(field_value, tuple):
                         values_data = prepare_value_tuple(field_value)
+                    elif isinstance(field_value, Enum):
+                        values_data.append(str(field_value))
                     else:
                         values_data.append(field_value)
                     value = values_data
@@ -322,7 +328,7 @@ class Object(ParseMixin):
                             _value[obj.to_dict()] = value_
                     elif field.dict_right:
                         for k, obj in value.items():
-                            _value[k] =  obj.to_dict()
+                            _value[k] = obj.to_dict()
                 value = _value
             elif value and isinstance(value, tuple):
                 value = prepare_value_tuple(field_value)

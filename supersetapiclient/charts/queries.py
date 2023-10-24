@@ -20,6 +20,7 @@ class CurrencyFormat(Object):
 class ColumnConfig(Object):
     horizontalAlign: HorizontalAlignType = HorizontalAlignType.LEFT
     d3NumberFormat: Optional[NumberFormatType] = NumberFormatType.ORIGINAL_VALUE
+    d3SmallNumberFormat: Optional[NumberFormatType] = NumberFormatType.ORIGINAL_VALUE
     alignPositiveNegative: Optional[bool] = None
     colorPositiveNegative: Optional[bool] = None
     showCellBars: Optional[bool] = None
@@ -48,7 +49,7 @@ Column = Union[AdhocColumn, str]
 class QueryFilterClause(Object):
     col: Column
     val: Optional[FilterValues]
-    op: FilterOperatorType = FilterOperatorType.EQUAL
+    op: FilterOperatorType = FilterOperatorType.EQUALS
 
 
 @dataclass
@@ -74,7 +75,7 @@ class AdhocMetricColumn(Object):
 @dataclass
 class AdhocMetric(Object):
     label: Optional[str] = default_string()
-    expressionType: FilterExpressionType = FilterExpressionType.CUSTOM_CQL
+    expressionType: FilterExpressionType = FilterExpressionType.CUSTOM_SQL
     sqlExpression: Optional[str] = None
     hasCustomLabel: Optional[bool] = False
     column: Optional[AdhocMetricColumn] = ObjectField(cls=AdhocMetricColumn, default_factory=AdhocMetricColumn)
@@ -82,16 +83,25 @@ class AdhocMetric(Object):
 
 
 Metric = Union[AdhocMetric, Literal['count', 'sum', 'avg', 'min', 'max', 'count distinct']]
-OrderBy = tuple[Metric, bool]
+OrderByTyping = tuple[Metric, bool]
 
-class MetricMixin:
+class OrderBy:
+
+    def __init__(self, automate:bool=True, sort_ascending: bool = True):
+        self.automate = automate
+        self.sort_ascending = sort_ascending
+
+    def __str__(self):
+        return f'automate: {self._automate}, sort_ascending: {self._sort_ascending}'
+
+class QueryMetricMixin:
     def _get_metric(self, label: str,
                         column: AdhocMetricColumn = None,
                         sql_expression: str = None,
                         aggregate: MetricType = MetricType.COUNT):
         expression_type = FilterExpressionType.SIMPLE
         if sql_expression:
-            expression_type = FilterExpressionType.CUSTOM_CQL
+            expression_type = FilterExpressionType.CUSTOM_SQL
 
         if aggregate:
             self._check_metric(aggregate)
@@ -100,16 +110,12 @@ class MetricMixin:
         _metric = {
             "expressionType": str(expression_type),
             "hasCustomLabel": True,
+            'column': column,
+            'sqlExpression': sql_expression,
+            'aggregate': aggregate
         }
         if label:
             _metric['label'] = label
-        if sql_expression:
-            _metric['sqlExpression'] = sql_expression
-        if column:
-            _metric['column'] = column
-        if aggregate:
-            _metric['aggregate'] = aggregate
-
         return AdhocMetric(**_metric)
 
     def _check_metric(self, value):
@@ -118,63 +124,56 @@ class MetricMixin:
             raise ValidationError(message='Metric not found.',
                                   solution=f'Use one of the options:{simple_metrics}')
 
-    def _add_simple_metric(self, metric:str):
+    def _add_simple_metric(self, metric:str, automatic_order: OrderBy):
         self._check_metric(metric)
-        if not self.metrics or (get_args(self.metrics) and get_args(self.metrics)[0] == Metric):
-            self.metrics: List[str] = []
         self.metrics.append(metric)
 
+        if automatic_order.automate:
+            self._add_simple_orderby(metric, automatic_order.sort_ascending)
+
     def _add_custom_metric(self, label: str,
+                           automatic_order: OrderBy,
                            column: AdhocMetricColumn = None,
                            sql_expression: str = None,
                            aggregate: MetricType = None):
         metric = self._get_metric(label, column, sql_expression, aggregate)
-        if isinstance(self.metrics, list):
-            self.metrics.append(metric)
+        self.metrics.append(metric)
+
+        if automatic_order and automatic_order.automate and not self.orderby:
+            self._add_custom_orderby(label, automatic_order.sort_ascending, column, sql_expression, aggregate)
+
+    def _add_simple_columns(self, column_name:str):
+        self.columns.append(column_name)
 
     def _add_custom_columns(self, label: str,
                            column: AdhocMetricColumn = None,
                            sql_expression: str = None,
                            aggregate: MetricType = None):
         metric = self._get_metric(label, column, sql_expression, aggregate)
-        if isinstance(self.columns, list):
-            self.columns.append(metric)
+        self.columns.append(metric)
         if column:
-            column.expressionType = FilterExpressionType.CUSTOM_CQL
+            column.expressionType = FilterExpressionType.CUSTOM_SQL
+
+    def _add_simple_orderby(self, column_name: str,
+                            sort_ascending: bool):
+        self.orderby.append((column_name, sort_ascending))
 
     def _add_custom_orderby(self, label: str,
-                           column: AdhocMetricColumn,
-                           sql_expression: str = None,
-                           aggregate: MetricType = None):
-        metric = self._get_metric(label, column, sql_expression, aggregate)
-        if isinstance(self.orderby, list):
-            self.orderby.append((metric, False))
-
-    def _add_simple_groupby(self, column_name:str, self_field: str = 'groupby'):
-        dimensions = getattr(self, self_field)
-        if not dimensions:
-            dimensions = []
-        dimensions.append(column_name)
-        setattr(self, self_field, dimensions)
-
-    def _add_custom_groupby(self, label: str,
-                            column: AdhocMetricColumn = None,
+                            sort_ascending: bool,
+                            column: AdhocMetricColumn,
                             sql_expression: str = None,
                             aggregate: MetricType = None):
         metric = self._get_metric(label, column, sql_expression, aggregate)
-        if isinstance(self.groupby, list):
-            self.groupby.append(metric)
-        if column:
-            column.expressionType = FilterExpressionType.CUSTOM_CQL
+        self.orderby.append((metric, sort_ascending))
 
 
 @dataclass
-class QueryObject(Object, MetricMixin):
-    row_limit: Optional[int] = 0
-    series_limit: Optional[int] = None
+class QueryObject(Object, QueryMetricMixin):
+    row_limit: Optional[int] = 100
+    series_limit: Optional[int] = 0
     series_limit_metric: Optional[Metric] = ObjectField(cls=AdhocMetric, default_factory=AdhocMetric)
     order_desc: bool = True
-    orderby: Optional[List[OrderBy]] = ObjectField(cls=AdhocMetric, default_factory=list)
+    orderby: Optional[List[OrderByTyping]] = ObjectField(cls=AdhocMetric, default_factory=list)
 
     filters: List[QueryFilterClause] = ObjectField(cls=QueryFilterClause, default_factory=list)
     extras: QuerieExtra = ObjectField(cls=QuerieExtra, default_factory=QuerieExtra)
@@ -186,23 +185,29 @@ class QueryObject(Object, MetricMixin):
         if not self.metrics:
             self.metrics:List[Metric] = []
         if not self.orderby:
-            self.orderby:List[OrderBy] = []
+            self.orderby:List[OrderByTyping] = []
         if not self.columns:
             self.columns:List[Metric] = []
         if not self.row_limit == 0:
             self.row_limit = 100
 
     def validate(self, data: dict):
-        pass
+        super().validate(data)
 
+        if not self.orderby:
+            raise ValidationError(message='Field orderby cannot be empty.',
+                                  solution='Set the "automatic_order=OrderBy(automate=True)" argument in the add_simple_metric or add_custom_metric methods. If you want to customize a different order, use the add_simple_orderby or add_custom_orderby methods.')
+        if not self.metrics:
+            raise ValidationError(message='Field metrics cannot be empty.',
+                                  solution='Use one of the add_simple_metric or add_custom_metric methods to add a queries.')
     def _add_simple_filter(self, column_name: Column,
                            value: FilterValues,
-                           operator: FilterOperatorType = FilterOperatorType.EQUAL) -> None:
+                           operator: FilterOperatorType = FilterOperatorType.EQUALS) -> None:
         query_filter_clause = QueryFilterClause(col=column_name, val=value, op=operator)
         self.filters.append(query_filter_clause)
 
     def _add_simple_groupby(self, column_name: str):
-        super()._add_simple_groupby(column_name, 'columns')
+        super()._add_simple_columns(column_name)
 
 
 @dataclass

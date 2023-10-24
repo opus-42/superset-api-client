@@ -48,7 +48,7 @@ class LoadJsonError(Exception):
 
 
 class ValidationError(Exception):
-    def __init__(self, message:str, solution:str = None):
+    def __init__(self, message:str, solution:str = 'There is not.'):
         # from django.core.exceptions import ValidationError
         super().__init__(message, solution)
         self.message = message

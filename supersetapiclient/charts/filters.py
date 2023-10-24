@@ -14,8 +14,8 @@ class AdhocFilterClause(Object):
     subject: str
     comparator: Optional[str] = None
     clause: str = default_string(default='WHERE')
-    operator: FilterOperatorType = FilterOperatorType.EQUAL
-    operatorId: str = field(default=FilterOperatorType.EQUAL.name)
+    operator: FilterOperatorType = FilterOperatorType.EQUALS
+    operatorId: str = field(default=FilterOperatorType.EQUALS.name)
     expressionType: FilterExpressionType = FilterExpressionType.SIMPLE
 
     isExtra: bool = False
@@ -23,4 +23,4 @@ class AdhocFilterClause(Object):
 
     def __post_init__(self):
         super().__post_init__()
-        self.operatorId = str(self.operator)
+        self.operatorId = str(self.operator.name)

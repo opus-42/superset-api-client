@@ -104,7 +104,7 @@ class LabelType(StringEnum):
 
 
 class FilterOperatorType(StringEnum):
-    EQUAL = '=='
+    EQUALS = '=='
     NOT_EQUAL = '!='
     LESS_THAN = '<'
     LESS_THAN_OR_EQUAL = '<='
@@ -142,7 +142,7 @@ class FilterStringOperatorsType(StringEnum):
 
 class FilterExpressionType(StringEnum):
     SIMPLE = 'SIMPLE'
-    CUSTOM_CQL = 'SQL'
+    CUSTOM_SQL = 'SQL'
 
 
 class SqlMapType(StringEnum):
